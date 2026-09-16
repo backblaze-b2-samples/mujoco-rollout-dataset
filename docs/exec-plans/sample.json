@@ -1,61 +1,32 @@
 {
   "$schema": "../../scripts/gen/sample.schema.json",
   "schema_version": 1,
-  "name": "Vibe Coding Starter Kit",
-  "slug": "vibe-coding-starter-kit",
-  "package_scope": "@vibe-coding-starter-kit",
-  "purpose": "A well-engineered full-stack foundation — dashboard, drag-and-drop upload and a file browser — with Backblaze B2 storage already wired in, so builders skip the boilerplate loop.",
-  "tagline": "Stop wiring boilerplate and start building.",
-  "primary_entity": { "schema": "FileMetadata", "singular": "file", "plural": "files" },
+  "name": "MuJoCo Rollout Dataset",
+  "slug": "mujoco-rollout-dataset",
+  "package_scope": "@mujoco-rollout-dataset",
+  "purpose": "A local pipeline that rolls out reinforcement-learning policies in MuJoCo Playground, renders each episode to video, and streams the rendered video plus per-step state, action and reward arrays and an episode-summary JSON to Backblaze B2 for offline policy analysis and behavioral-cloning dataset curation.",
+  "tagline": "Roll out simulated robots, stream the dataset straight to B2.",
+  "primary_entity": { "schema": "Rollout", "singular": "rollout", "plural": "rollouts" },
   "features": [
-    {
-      "title": "File Upload",
-      "route": "/upload",
-      "doc": "docs/features/file-upload.md",
-      "summary": "drag-and-drop upload with real-time progress",
-      "workflow_heading": "Upload Files"
-    },
-    {
-      "title": "File Browser",
-      "route": "/files",
-      "doc": "docs/features/file-browser.md",
-      "summary": "list, preview, download, delete files",
-      "workflow_heading": "Browse and Manage Files"
-    },
-    {
-      "title": "Dashboard",
-      "route": "/",
-      "doc": "docs/features/dashboard.md",
-      "summary": "stats cards, upload chart, recent uploads",
-      "workflow_heading": "View Dashboard"
-    },
-    {
-      "title": "Metadata Extraction",
-      "route": null,
-      "doc": "docs/features/metadata-extraction.md",
-      "summary": "image dimensions, EXIF, PDF info, checksums"
-    },
-    {
-      "title": "Settings",
-      "route": "/settings",
-      "doc": "docs/features/settings.md",
-      "summary": "theme plus labelled demo preference fields",
-      "workflow_heading": "Change Preferences"
-    }
+    { "title": "Rollout Configuration", "route": "/rollouts", "doc": "docs/features/rollout-configuration.md", "summary": "create, edit, list and delete rollout jobs (environment, episode count, resolution, camera, policy)", "workflow_heading": "Configure a Rollout" },
+    { "title": "Policy Rollout & Rendering", "route": null, "doc": "docs/features/policy-rollout.md", "summary": "MuJoCo Playground rolls out a policy, records state/action/reward, and renders each episode to MP4 — runs locally, CPU by default" },
+    { "title": "B2 Dataset Write", "route": null, "doc": "docs/features/b2-dataset-write.md", "summary": "per episode: MP4 + state/action/reward .npy + summary JSON streamed to B2" },
+    { "title": "Dataset Explorer", "route": "/dataset", "doc": "docs/features/dataset-explorer.md", "summary": "browse rollouts and episodes, play rendered video and download trajectory arrays via presigned URLs", "workflow_heading": "Explore the Dataset" },
+    { "title": "Bucket Explorer", "route": "/files", "doc": "docs/features/file-browser.md", "summary": "browse the full B2 bucket: list, preview, download, delete", "workflow_heading": "Browse the Bucket" },
+    { "title": "Dashboard", "route": "/", "doc": "docs/features/dashboard.md", "summary": "rollout and episode stats, cumulative reward, storage used, recent rollouts", "workflow_heading": "View Dashboard" }
   ],
   "b2_surface": [
-    { "operation": "put_object", "why": "store an uploaded object" },
-    { "operation": "presigned PUT", "why": "the browser uploads bytes directly to B2, bypassing the Function payload cap" },
-    { "operation": "list_objects_v2", "why": "the shared full-bucket listing behind the file list and the stats cards" },
-    { "operation": "head_object", "why": "cheap per-key metadata, and the /health connectivity probe" },
-    { "operation": "get_object", "why": "re-read bytes to recompute rich metadata on demand" },
-    { "operation": "presigned GET", "why": "download and inline preview URLs" },
-    { "operation": "delete_object", "why": "remove an object" }
+    { "operation": "put_object", "why": "write rollout config JSON, rendered episode MP4, state/action/reward .npy arrays, and episode-summary JSON" },
+    { "operation": "list_objects_v2", "why": "list rollouts and episodes under the rollouts/ prefix, and back the full-bucket explorer and dashboard stats" },
+    { "operation": "head_object", "why": "the /health connectivity probe and cheap per-asset existence and size checks" },
+    { "operation": "get_object", "why": "re-read episode-summary JSON and small arrays server-side" },
+    { "operation": "presigned GET", "why": "inline playback of rendered MP4 and download of trajectory .npy arrays" },
+    { "operation": "delete_object", "why": "delete a rollout and every artifact under its prefix" }
   ],
-  "b2_key_prefix": "uploads/",
+  "b2_key_prefix": "rollouts/",
   "stack": {
     "web": "Next.js 16, React 19, Tailwind v4, shadcn/ui, TanStack Query, Recharts",
-    "api": "FastAPI, Python 3.12+, boto3, Pydantic v2, Pillow, PyPDF2",
+    "api": "FastAPI, Python 3.12+, boto3, Pydantic v2, MuJoCo Playground (mujoco + mujoco-mjx + jax), imageio",
     "storage": "Backblaze B2 (S3-compatible API)",
     "package_manager": "pnpm workspaces"
   },
@@ -68,18 +39,7 @@
     { "name": "B2_PUBLIC_URL_BASE", "required": false, "secret": false, "note": "public object base URL, when the bucket is public" },
     { "name": "NEXT_PUBLIC_API_URL", "required": false, "secret": false, "note": "separate-origin deploys only; Next.js inlines it at build time" }
   ],
-  "attribution_token": "b2ai-oss-start",
-  "repo": { "org": "backblaze-b2-samples", "name": "vibe-coding-starter-kit" },
-  "screenshots": [
-    {
-      "path": "docs/images/b2-starterkit-dashboard1.png",
-      "alt": "Dashboard view showing stat cards, upload activity chart, and recent uploads table",
-      "caption": "**Dashboard** — stats, upload activity, and recent uploads at a glance:"
-    },
-    {
-      "path": "docs/images/b2-starterkit-fileview2.png",
-      "alt": "File browser view showing a tree of files with hover actions",
-      "caption": "**File browser** — tree view with preview, download, and delete:"
-    }
-  ]
+  "attribution_token": "b2ai-mujoco-rollout-dataset",
+  "repo": { "org": "backblaze-b2-samples", "name": "mujoco-rollout-dataset" },
+  "screenshots": []
 }

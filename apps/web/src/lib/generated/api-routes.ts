@@ -11,7 +11,7 @@
 
 /** The verbs this app's routes actually use, narrowed from the contract. */
 export type ApiClientRoute = {
-  method: "delete" | "get" | "post";
+  method: "delete" | "get" | "patch" | "post";
   path: string;
 };
 
@@ -24,6 +24,7 @@ export type ApiClientRoute = {
 export const API_CLIENT_ROUTES = {
   fileByKeyDelete: { method: "delete", path: "/files-by-key" },
   legacyFileDelete: { method: "delete", path: "/files/{key}" },
+  rolloutDelete: { method: "delete", path: "/rollouts/{rollout_id}" },
   files: { method: "get", path: "/files" },
   fileByKeyDetail: { method: "get", path: "/files-by-key/detail" },
   fileByKeyDownload: { method: "get", path: "/files-by-key/download" },
@@ -35,6 +36,11 @@ export const API_CLIENT_ROUTES = {
   fileStats: { method: "get", path: "/files/stats" },
   uploadActivity: { method: "get", path: "/files/stats/activity" },
   health: { method: "get", path: "/health" },
-  uploadPresign: { method: "post", path: "/upload/presign" },
-  uploadVerify: { method: "post", path: "/upload/verify" },
+  rollouts: { method: "get", path: "/rollouts" },
+  rolloutDetail: { method: "get", path: "/rollouts/{rollout_id}" },
+  rolloutEpisodes: { method: "get", path: "/rollouts/{rollout_id}/episodes" },
+  episodeAssets: { method: "get", path: "/rollouts/{rollout_id}/episodes/{episode_id}/assets" },
+  rolloutUpdate: { method: "patch", path: "/rollouts/{rollout_id}" },
+  rolloutCreate: { method: "post", path: "/rollouts" },
+  rolloutRun: { method: "post", path: "/rollouts/{rollout_id}/run" },
 } as const satisfies Record<string, ApiClientRoute>;

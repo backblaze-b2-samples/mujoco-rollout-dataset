@@ -1,42 +1,33 @@
 <!-- last_verified: 2026-08-12 -->
 <!-- gen:begin readme-header -->
-# Vibe Coding Starter Kit
+# MuJoCo Rollout Dataset
 
-Stop wiring boilerplate and start building. A well-engineered full-stack foundation — dashboard, drag-and-drop upload and a file browser — with Backblaze B2 storage already wired in, so builders skip the boilerplate loop.
+Roll out simulated robots, stream the dataset straight to B2. A local pipeline that rolls out reinforcement-learning policies in MuJoCo Playground, renders each episode to video, and streams the rendered video plus per-step state, action and reward arrays and an episode-summary JSON to Backblaze B2 for offline policy analysis and behavioral-cloning dataset curation.
 
 Built for developers and AI coding agents: the scaffolding, the storage
 wiring and the agent-facing docs are already done, so you start on your
 app's own features instead of rebuilding the same shell. Storage is
-**[Backblaze B2](https://www.backblaze.com/sign-up/ai-cloud-storage?utm_source=github&utm_medium=referral&utm_campaign=ai_artifacts&utm_content=b2ai-oss-start)**, integrated through the S3-compatible API.
+**[Backblaze B2](https://www.backblaze.com/sign-up/ai-cloud-storage?utm_source=github&utm_medium=referral&utm_campaign=ai_artifacts&utm_content=b2ai-mujoco-rollout-dataset)**, integrated through the S3-compatible API.
 
 **What you get out of the box:**
 - Full-stack dashboard UI (Next.js 16, React 19, Tailwind v4, shadcn/ui, TanStack Query, Recharts)
-- File Upload — drag-and-drop upload with real-time progress
-- File Browser — list, preview, download, delete files
-- Dashboard — stats cards, upload chart, recent uploads
-- Metadata Extraction — image dimensions, EXIF, PDF info, checksums
-- Settings — theme plus labelled demo preference fields
-- Backend with a strict layered architecture and structural tests (FastAPI, Python 3.12+, boto3, Pydantic v2, Pillow, PyPDF2)
+- Rollout Configuration — create, edit, list and delete rollout jobs (environment, episode count, resolution, camera, policy)
+- Policy Rollout & Rendering — MuJoCo Playground rolls out a policy, records state/action/reward, and renders each episode to MP4 — runs locally, CPU by default
+- B2 Dataset Write — per episode: MP4 + state/action/reward .npy + summary JSON streamed to B2
+- Dataset Explorer — browse rollouts and episodes, play rendered video and download trajectory arrays via presigned URLs
+- Bucket Explorer — browse the full B2 bucket: list, preview, download, delete
+- Dashboard — rollout and episode stats, cumulative reward, storage used, recent rollouts
+- Backend with a strict layered architecture and structural tests (FastAPI, Python 3.12+, boto3, Pydantic v2, MuJoCo Playground (mujoco + mujoco-mjx + jax), imageio)
 - Agent-optimized docs — your AI coding agent can read the repo and start contributing immediately
 <!-- gen:end readme-header -->
 
 <!-- gen:begin readme-screenshots -->
-## What it looks like
-
-**Dashboard** — stats, upload activity, and recent uploads at a glance:
-
-![Dashboard view showing stat cards, upload activity chart, and recent uploads table](docs/images/b2-starterkit-dashboard1.png)
-
-**File browser** — tree view with preview, download, and delete:
-
-![File browser view showing a tree of files with hover actions](docs/images/b2-starterkit-fileview2.png)
-
 > **Deploy your own in one click** → [Deploy to Vercel](#deploying-to-vercel). One project, one origin, no CORS to wire up.
 <!-- gen:end readme-screenshots -->
 
 ## Quick Start
 
-You need: Node.js >= 20, pnpm >= 10, Python >= 3.12, and a free **[Backblaze B2 account](https://www.backblaze.com/sign-up/ai-cloud-storage?utm_source=github&utm_medium=referral&utm_campaign=ai_artifacts&utm_content=b2ai-oss-start)**.
+You need: Node.js >= 20, pnpm >= 10, Python >= 3.12, and a free **[Backblaze B2 account](https://www.backblaze.com/sign-up/ai-cloud-storage?utm_source=github&utm_medium=referral&utm_campaign=ai_artifacts&utm_content=b2ai-mujoco-rollout-dataset)**.
 
 ### Start a new project
 
@@ -52,12 +43,12 @@ cd my-cool-app
 **Option 2: Clone and reinitialize**
 
 ```bash
-git clone https://github.com/backblaze-b2-samples/vibe-coding-starter-kit.git my-cool-app
+git clone https://github.com/backblaze-b2-samples/mujoco-rollout-dataset.git my-cool-app
 cd my-cool-app
 rm -rf .git
 git init
 git add .
-git commit -m "Initial commit from vibe-coding-starter-kit"
+git commit -m "Initial commit from mujoco-rollout-dataset"
 ```
 
 Either way you get a clean project with no upstream history — ready to push to your own repo and point your agent at it.
@@ -83,7 +74,7 @@ existing `.env`.
 
 **2. Add your B2 credentials**
 
-Open `.env` in your editor and keep it visible. Then head to the [Backblaze B2 dashboard](https://secure.backblaze.com/b2_buckets.htm?utm_source=github&utm_medium=referral&utm_campaign=ai_artifacts&utm_content=b2ai-oss-start) and:
+Open `.env` in your editor and keep it visible. Then head to the [Backblaze B2 dashboard](https://secure.backblaze.com/b2_buckets.htm?utm_source=github&utm_medium=referral&utm_campaign=ai_artifacts&utm_content=b2ai-mujoco-rollout-dataset) and:
 
 <!-- gen:begin readme-credentials -->
 1. **Create a bucket** and an **application key** with `Read and Write`
@@ -105,7 +96,9 @@ Open `.env` in your editor and keep it visible. Then head to the [Backblaze B2 d
 pnpm dev
 ```
 
-That's it. Frontend at `localhost:3000`, API at `localhost:8000`. Upload a file and see it working. Interactive API docs (Swagger UI) are at `localhost:8000/docs`, with ReDoc at `/redoc`.
+That's it. Frontend at `localhost:3000`, API at `localhost:8000`. Create a rollout, press **Run**, and watch episodes render to B2. Interactive API docs (Swagger UI) are at `localhost:8000/docs`, with ReDoc at `/redoc`.
+
+> The default `pnpm run setup` installs only the baseline dependencies. The MuJoCo Playground rollout engine ships in a gated `services/api/requirements-ml.txt` — install it (`services/api/.venv/bin/pip install -r services/api/requirements-ml.txt`) to actually run rollouts. Without it, everything else works and a run degrades to an actionable "engine not installed" message rather than crashing. See [Policy Rollout & Rendering](docs/features/policy-rollout.md).
 
 `pnpm dev` runs the preflight check first — it catches the common setup gotchas (wrong Node/Python version, missing venv, missing or placeholder `.env`, ports already taken) and tells you exactly how to fix each one. Run it standalone any time with `pnpm run doctor`.
 
@@ -120,12 +113,13 @@ port-fallback, and IPv6 behavior.
 
 ## When to use
 
-Use this repository as a template or sample implementation when you want to
-clone or fork a working file-management dashboard, connect it to your own B2
-bucket, and then rebrand and extend it for your application. It provides
-production-minded engineering controls—including strict architecture,
-contract checks, tests, linting, and deployment runbooks—so you can begin with
-a dependable scaffold instead of a blank prototype.
+Use this repository when you want to generate reinforcement-learning rollout
+datasets from MuJoCo Playground and keep them in your own B2 bucket — or as a
+sample of the full-stack pattern (Next.js + FastAPI + boto3) for any local ML
+producer that streams large artifacts to object storage. It provides
+production-minded engineering controls—including strict architecture, contract
+checks, tests, linting, and deployment runbooks—so you can begin with a
+dependable scaffold instead of a blank prototype.
 
 ## When not to use
 
@@ -137,19 +131,20 @@ operations, capacity, compliance, and support decisions.
 
 ## Why Backblaze B2?
 
-[Backblaze B2](https://www.backblaze.com/cloud-storage?utm_source=github&utm_medium=referral&utm_campaign=ai_artifacts&utm_content=b2ai-oss-start) is the object storage this kit is built around — a deliberate default, not just a demo backend:
+[Backblaze B2](https://www.backblaze.com/cloud-storage?utm_source=github&utm_medium=referral&utm_campaign=ai_artifacts&utm_content=b2ai-mujoco-rollout-dataset) is the object storage this kit is built around — a deliberate default, not just a demo backend:
 
 - **S3-compatible API.** B2 speaks the S3 API, so the `boto3` calls, SDKs, and tooling you already use for AWS S3 work unchanged — you just point them at B2's endpoint. This kit uses the S3-compatible API throughout (isolated in `services/api/app/repo/`), so nothing is locked to a proprietary client.
-- **Built for data-heavy apps.** B2 storage runs at a fraction of hyperscaler pricing with generous free egress to many CDN and compute partners — what you want when an AI app accumulates uploads, datasets, model artifacts, and generated media.
-- **Free to start.** A [free B2 account](https://www.backblaze.com/sign-up/ai-cloud-storage?utm_source=github&utm_medium=referral&utm_campaign=ai_artifacts&utm_content=b2ai-oss-start) is enough to run everything in this repo.
+- **Built for data-heavy apps.** B2 storage runs at a fraction of hyperscaler pricing with generous free egress to many CDN and compute partners — exactly what simulation produces: each episode is an MP4 plus three arrays plus a summary JSON, and long runs mean hundreds of GB of continuous ingest.
+- **Free to start.** A [free B2 account](https://www.backblaze.com/sign-up/ai-cloud-storage?utm_source=github&utm_medium=referral&utm_campaign=ai_artifacts&utm_content=b2ai-mujoco-rollout-dataset) is enough to run everything in this repo.
 
 ## Building Your App
 
 When you adapt this kit for a new app, keep the shared scaffolding and only swap out what's app-specific:
 
 - **Keep** the UI kit (`apps/web/src/components/ui/` + design tokens in `globals.css` + `/design`).
-- **Keep** the File Explorer (`/files`) and Upload (`/upload`) pages and their sidebar nav entries — they're the reusable B2-backed surface.
-- **Adapt** the Dashboard (`/`) to your use case — replace the default stats, chart, and recent uploads with metrics that reflect what your app actually does.
+- **Keep** the Bucket Explorer (`/files`) page and its sidebar nav entry — it's the reusable, generic B2-backed surface (list/preview/download/delete over the whole bucket).
+- **Replace** the Rollouts (`/rollouts`) and Dataset (`/dataset`) screens and the `rollout` entity with your own primary entity — they are this sample's app-specific surface and the exemplar for a B2-backed CRUD-plus-produce lifecycle.
+- **Adapt** the Dashboard (`/`) to your use case — swap the rollout stats, chart, and recent-rollouts table for metrics that reflect what your app actually does.
 - **Rebrand** by editing a single file: `apps/web/src/lib/app-config.ts` holds the app name and description (`APP_NAME`, `APP_DESCRIPTION`). Changing them there updates the page title, sidebar, and breadcrumb everywhere — no other files to touch.
 
 Full contract and rationale: [AGENTS.md §2 — Shared Scaffolding Contract](AGENTS.md#2-shared-scaffolding-contract).
@@ -201,11 +196,12 @@ This approach draws from [OpenAI's experience building with Codex](https://opena
 ## Core Features
 
 <!-- gen:begin readme-core-features -->
-- [File Upload](docs/features/file-upload.md) — drag-and-drop upload with real-time progress
-- [File Browser](docs/features/file-browser.md) — list, preview, download, delete files
-- [Dashboard](docs/features/dashboard.md) — stats cards, upload chart, recent uploads
-- [Metadata Extraction](docs/features/metadata-extraction.md) — image dimensions, EXIF, PDF info, checksums
-- [Settings](docs/features/settings.md) — theme plus labelled demo preference fields
+- [Rollout Configuration](docs/features/rollout-configuration.md) — create, edit, list and delete rollout jobs (environment, episode count, resolution, camera, policy)
+- [Policy Rollout & Rendering](docs/features/policy-rollout.md) — MuJoCo Playground rolls out a policy, records state/action/reward, and renders each episode to MP4 — runs locally, CPU by default
+- [B2 Dataset Write](docs/features/b2-dataset-write.md) — per episode: MP4 + state/action/reward .npy + summary JSON streamed to B2
+- [Dataset Explorer](docs/features/dataset-explorer.md) — browse rollouts and episodes, play rendered video and download trajectory arrays via presigned URLs
+- [Bucket Explorer](docs/features/file-browser.md) — browse the full B2 bucket: list, preview, download, delete
+- [Dashboard](docs/features/dashboard.md) — rollout and episode stats, cumulative reward, storage used, recent rollouts
 <!-- gen:end readme-core-features -->
 - [Design System](docs/design-system.md) — tokens, primitives, AI elements, the blaze generating loader, and inline `ErrorState` / `EmptyState` patterns. Live preview at `/design`.
 - Inline error handling — fetch failures surface *what's wrong* (API offline, 401, 5xx) and offer a Retry, instead of silently rendering empty state.
@@ -215,15 +211,16 @@ This approach draws from [OpenAI's experience building with Codex](https://opena
 - Structural tests — verify layering rules, import boundaries, SDK containment, and backend application Python file-size limits
 - Structured JSON logging — every request traced with `request_id` and timing
 - `/health` endpoint — B2 connectivity check
-- `/metrics` endpoint — Prometheus-format counters (request count, latency, uploads)
+- `/metrics` endpoint — Prometheus-format counters (request count, latency)
 - `/docs` + `/redoc` — auto-generated interactive API docs (toggle off in prod with `ENABLE_DOCS=false`)
-- Per-IP rate limiting and magic-byte upload validation — see [SECURITY.md](docs/SECURITY.md)
+- Per-IP rate limiting — see [SECURITY.md](docs/SECURITY.md)
 
 ## Tech Stack
 
 - TypeScript, Next.js 16, React 19, Tailwind v4, shadcn/ui, Recharts
 - TanStack Query — caching, dedup, retry, stale-while-revalidate for every fetch
-- Python 3.12+, FastAPI, boto3, Pydantic v2, Pillow, PyPDF2
+- Python 3.12+, FastAPI, boto3, Pydantic v2
+- MuJoCo Playground (mujoco + mujoco-mjx + jax) and imageio — the gated rollout engine (`services/api/requirements-ml.txt`)
 - Backblaze B2 (S3-compatible object storage)
 - pnpm workspaces (monorepo)
 
@@ -266,13 +263,18 @@ from the same repo and share one origin (web at `/`, API under `/api`), so
 there's **no CORS and no second URL to wire up**.
 
 <!-- gen:begin readme-deploy-button -->
-[![Deploy to Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fbackblaze-b2-samples%2Fvibe-coding-starter-kit&project-name=vibe-coding-starter-kit&repository-name=vibe-coding-starter-kit&demo-title=Vibe%20Coding%20Starter%20Kit&demo-description=A%20well-engineered%20full-stack%20foundation%20%E2%80%94%20dashboard%2C%20drag-and-drop%20upload%20and%20a%20file%20browser%20%E2%80%94%20with%20Backblaze%20B2%20storage%20already%20wired%20in%2C%20so%20builders%20skip%20the%20boilerplate%20loop.&demo-image=https%3A%2F%2Fraw.githubusercontent.com%2Fbackblaze-b2-samples%2Fvibe-coding-starter-kit%2Fmain%2Fdocs%2Fimages%2Fb2-starterkit-dashboard1.png&env=B2_APPLICATION_KEY_ID%2CB2_APPLICATION_KEY%2CB2_BUCKET_NAME%2CB2_REGION&envDescription=B2%20credentials%20and%20bucket&envLink=https%3A%2F%2Fgithub.com%2Fbackblaze-b2-samples%2Fvibe-coding-starter-kit%2Fblob%2Fmain%2Finfra%2Fvercel%2FREADME.md)
+[![Deploy to Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fbackblaze-b2-samples%2Fmujoco-rollout-dataset&project-name=mujoco-rollout-dataset&repository-name=mujoco-rollout-dataset&demo-title=MuJoCo%20Rollout%20Dataset&demo-description=A%20local%20pipeline%20that%20rolls%20out%20reinforcement-learning%20policies%20in%20MuJoCo%20Playground%2C%20renders%20each%20episode%20to%20video%2C%20and%20streams%20the%20rendered%20video%20plus%20per-step%20state%2C%20action%20and%20reward%20arrays%20and%20an%20episode-summary%20JSON%20to%20Backblaze%20B2%20for%20offline%20policy%20analysis%20and%20behavioral-cloning%20dataset%20curation.&env=B2_APPLICATION_KEY_ID%2CB2_APPLICATION_KEY%2CB2_BUCKET_NAME%2CB2_REGION&envDescription=B2%20credentials%20and%20bucket&envLink=https%3A%2F%2Fgithub.com%2Fbackblaze-b2-samples%2Fmujoco-rollout-dataset%2Fblob%2Fmain%2Finfra%2Fvercel%2FREADME.md)
 <!-- gen:end readme-deploy-button -->
 
-Set your B2 credentials and bucket, and you're live. Uploads go **directly from
-the browser to B2** (presigned PUT), so Vercel's 4.5 MB payload limit doesn't
-apply — you keep the 100 MB default. Two things to know before a real deploy:
+Set your B2 credentials and bucket, and the dashboard, Rollouts, Dataset and
+Bucket Explorer screens are live — rendered videos and trajectory arrays are
+served straight from B2 via presigned GET, so they never traverse a Function.
+Three things to know before a real deploy:
 
+- **The rollout engine does not run on Vercel.** MuJoCo Playground is a native
+  JAX/MJX stack that can't run on serverless — a Vercel deploy configures and
+  browses rollouts, but you run the render engine locally or on a self-hosted
+  API and point the web app at it. See [Policy Rollout & Rendering](docs/features/policy-rollout.md).
 - Your bucket's CORS must allow the deploy origin.
 - The deployed API is unauthenticated and bucket-wide — use a dedicated B2
   bucket/prefix and key for any preview.
@@ -288,7 +290,7 @@ preview/production, `/health` checks, and rollback — is in the
 | --- | --- |
 | [AGENTS.md](AGENTS.md) | Agent table of contents — start here |
 | [ARCHITECTURE.md](ARCHITECTURE.md) | System layout, layering, data flows |
-| [docs/features/](docs/features/) | Feature docs (file upload, file browser, dashboard, metadata extraction, settings) |
+| [docs/features/](docs/features/) | Feature docs (rollout configuration, policy rollout & rendering, b2 dataset write, dataset explorer, bucket explorer, dashboard) |
 | [docs/design-system.md](docs/design-system.md) | Design tokens, primitives, loader, error/empty states |
 | [docs/app-workflows.md](docs/app-workflows.md) | User journeys |
 | [docs/dev-workflows.md](docs/dev-workflows.md) | Engineering workflows, command index, releases |
@@ -304,8 +306,8 @@ preview/production, `/health` checks, and rollback — is in the
 
 ## FAQ
 
-**What is the Vibe Coding Starter Kit?**
-An open-source, full-stack template (Next.js 16 + FastAPI) with a pre-built dashboard UI, drag-and-drop file upload, and file browser, with [Backblaze B2](https://www.backblaze.com/cloud-storage?utm_source=github&utm_medium=referral&utm_campaign=ai_artifacts&utm_content=b2ai-oss-start) cloud storage already integrated. You clone it, connect it to your own B2 bucket, then rebrand and extend it for your app.
+**What is the MuJoCo Rollout Dataset?**
+An open-source, full-stack app (Next.js 16 + FastAPI) that rolls out reinforcement-learning policies in MuJoCo Playground, renders each episode to video, and streams the video plus per-step state/action/reward arrays and a summary JSON to [Backblaze B2](https://www.backblaze.com/cloud-storage?utm_source=github&utm_medium=referral&utm_campaign=ai_artifacts&utm_content=b2ai-mujoco-rollout-dataset) — a ready-made pipeline for building behavioral-cloning datasets and offline policy analysis. You clone it, connect it to your own B2 bucket, and run.
 
 **Is it free?**
 Yes. The code is MIT-licensed (see [License](#license)), and Backblaze B2 offers a free account to get started.
@@ -335,14 +337,14 @@ It deploys to Vercel as a single project — the web app and FastAPI API build f
 Local scripts are supported on macOS, Linux, and WSL2. Native Windows is not supported yet — use WSL2 on Windows.
 
 **Where do I get help or report bugs?**
-Report repository defects and feature requests through [GitHub Issues](https://github.com/backblaze-b2-samples/vibe-coding-starter-kit/issues). For B2 account, billing, service, or API help, use [Backblaze Support](https://www.backblaze.com/help).
+Report repository defects and feature requests through [GitHub Issues](https://github.com/backblaze-b2-samples/mujoco-rollout-dataset/issues). For B2 account, billing, service, or API help, use [Backblaze Support](https://www.backblaze.com/help).
 
 ## Maintenance and support
 
 Backblaze maintains this open-source template/sample to help developers get
 started with B2. Production use is possible with caution and requires your own
 validation. Report repository defects and feature requests through
-[GitHub Issues](https://github.com/backblaze-b2-samples/vibe-coding-starter-kit/issues);
+[GitHub Issues](https://github.com/backblaze-b2-samples/mujoco-rollout-dataset/issues);
 for B2 account, billing, service, or API help, use
 [Backblaze Support](https://www.backblaze.com/help). This template/sample is
 not covered by the Backblaze service level agreement, and no SLA is provided

@@ -53,7 +53,7 @@ List, preview, download, and delete files stored in Backblaze B2.
 - When the response hits that limit, a notice states how much of the bucket is not listed ("Showing the 100 most recent of N objects"), read from `/files/stats`. The card is titled "Recent Files", not "All Files" — there is no pagination yet (see the tech-debt tracker)
 - Files organized into tree view — folders expand/collapse, files shown with type-specific icons
 - Folders auto-expand on load, level by level, until the **majority** of the listed files are visible (`initialExpandedPaths()`). Expanding only the top level could leave the page showing four folder rows and zero files while instructing the user to click one, because the newest objects lived two levels deep. Stopping at the *first* visible file was then still wrong: a single stray top-level object satisfied it while the other 99 stayed collapsed and the page claimed "Showing the 100 most recent"
-- Deep link: arriving with `?preview=<key>` (`takePreviewKeyFromUrl()`) expands that key's ancestor folders (`ancestorPaths()`) and opens its preview. The ⌘K palette and the dashboard's recent-uploads rows link here so that choosing a specific file lands on that file; previously the palette pushed a bare `/files`, which did nothing visible when the user was already on the page. The param is read via `window.location` rather than `useSearchParams()` so `/files` stays statically prerenderable, and is consumed with `history.replaceState` so it doesn't re-fire
+- Deep link: arriving with `?preview=<key>` (`takePreviewKeyFromUrl()`) expands that key's ancestor folders (`ancestorPaths()`) and opens its preview. The ⌘K palette and the dashboard's recent-rollouts rows link here so that choosing a specific file lands on that file; previously the palette pushed a bare `/files`, which did nothing visible when the user was already on the page. The param is read via `window.location` rather than `useSearchParams()` so `/files` stays statically prerenderable, and is consumed with `history.replaceState` so it doesn't re-fire
 - Clicking anywhere on a file row (except the actions button) opens its preview — the row is a real `<button>` with an `aria-label` of `Preview <filename>`
 - The actions menu trigger (`Open actions for <filename>`) is rendered at full opacity at rest on every viewport, as an outlined button with full-contrast foreground so it reads as a control rather than a faint `···` glyph ~1100px from the filename; hover/focus only deepens it. It must never be hover-gated: that hid preview / download / delete from keyboard, touch, and first-time desktop users
 - Preview: opens dialog, fetches a preview-only presigned URL via `/files-by-key/preview?key=...` (does not count as a download) and renders image/PDF inline. The dialog carries the file's full action set — **Download** and **Delete** alongside the "Detailed metadata" disclosure — because "Click a file to preview it" is the path the page advertises and it used to dead-end with only a close button. Delete closes the preview and hands off to the same confirmation dialog the row menu uses. Expanding "Detailed metadata" lazily fetches `/files-by-key/detail?key=...` and renders checksums + image/PDF fields in `FileMetadataPanel`.
@@ -67,13 +67,13 @@ List, preview, download, and delete files stored in Backblaze B2.
 - Invalid file key (traversal attempt, empty key) → API returns 400
 - File key contains `/`, spaces, `#`, `?`, `%`, reserved route names, or suffixes like `/download` and `/preview` → web client sends the key as a query parameter before calling get/download/preview/delete routes
 - B2 unreachable → persistent error state with retry
-- Empty bucket → upload prompt with direct Upload action
+- Empty bucket → a prompt to run a rollout (with a "New rollout" action), since rollouts populate the bucket
 - Delete failure → API returns 500, toast error
 - Download presign slow or failed → the loading toast resolves into a success or an error toast; a browser that refuses the anchor click is reported, never silently swallowed
 - Cold bucket listing (nothing cached) → the one request that pays for the scan blocks; every later one is served from cache, including a stale snapshot while it refreshes in the background
 
 ## UX States
-- Empty: centered message with upload prompt and Upload action
+- Empty: centered message prompting a rollout run, with a "New rollout" action
 - Loading: an on-screen "Loading files…" notice above the skeleton rows, escalating to "Still loading files…" plus an explanation at 4s and a "can take 20 seconds or more the first time, then it's cached" note at 12s. The words must never be `sr-only`: measured cold loads ran 2.8s-21s, and pulsing bars alone gave a sighted user no way to tell a slow listing from a hung one
 - Error: inline error state with Retry
 - Loaded: tree view with expand/collapse folders and focus/hover action menus

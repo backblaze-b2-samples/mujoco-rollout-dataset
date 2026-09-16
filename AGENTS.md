@@ -29,15 +29,15 @@ These pieces are shared scaffolding rather than app-specific code: keep them, an
 
 **Keep as-is (do not strip, rename, or replace)**
 - **UI kit / design system.** `apps/web/src/components/ui/` (shadcn primitives), the design tokens in `apps/web/src/app/globals.css`, and the `/design` reference page. Build new screens with these primitives; never edit the generated `components/ui/` files directly. Restyling happens through tokens in `globals.css`.
-- **File Explorer.** `/files` route, `apps/web/src/app/files/`, and `apps/web/src/components/files/`. The Files sidebar entry in `apps/web/src/components/layout/app-sidebar.tsx` stays.
-- **Upload.** `/upload` route, `apps/web/src/app/upload/`, and `apps/web/src/components/upload/`. The Upload sidebar entry stays.
-- The sidebar nav itself (Dashboard, Upload, Files, Settings, plus the Design System utility link).
+- **Bucket Explorer.** `/files` route, `apps/web/src/app/files/`, and `apps/web/src/components/files/` — the generic full-bucket browse surface. The Files sidebar entry in `apps/web/src/components/layout/app-sidebar.tsx` stays.
+- The sidebar nav pattern (Dashboard, Rollouts, Dataset, Files, Settings, plus the Design System utility link).
 
-**Adapt to this app**
-- **Dashboard.** `/` route and `apps/web/src/components/dashboard/` (stats cards, upload chart, recent uploads table) are illustrative defaults. Replace them with metrics, charts, and tables that reflect what this app actually does (e.g. transcripts processed, embeddings indexed, classifications run). New aggregations must flow through the same `runtime -> service -> repo` layering and be exposed via TanStack Query hooks in `apps/web/src/lib/queries.ts` — no bare `useEffect + fetch`, and no hand-added `qk` entry: query keys come from `pnpm gen:api`.
-- Update `docs/features/dashboard.md` in the same PR as any dashboard change (see §9).
+**App-specific (this sample's own primary entity — the exemplar to replace with yours)**
+- **Rollouts & Dataset.** `/rollouts` and `/dataset` routes, `apps/web/src/components/rollouts/` and `apps/web/src/components/dataset/`, plus `services/api/app/{runtime,service,repo,types}` for `rollout*`. This is the `Rollout` primary-entity lifecycle (create/read/edit/delete/run) and its scoped dataset explorer.
+- **Dashboard.** `/` route and `apps/web/src/components/dashboard/` (stats cards, episodes chart, recent-rollouts table). Replace them with metrics, charts, and tables that reflect what your app does. New aggregations must flow through the same `runtime -> service -> repo` layering and be exposed via TanStack Query hooks in `apps/web/src/lib/queries.ts` — no bare `useEffect + fetch`, and no hand-added `qk` entry: query keys come from `pnpm gen:api`.
+- Update `docs/features/*.md` in the same PR as any feature change (see §9).
 
-**Why this contract exists** — the UI kit, Files, and Upload pages are the reusable B2-backed scaffolding; stripping them costs the app its whole storage surface. The dashboard is the one screen designed to be rewritten per app.
+**Why this contract exists** — the UI kit and the Bucket Explorer (Files) are the reusable B2-backed scaffolding; stripping them costs the app its whole storage surface. The Rollouts, Dataset, and Dashboard screens are this app's own surface, designed to be rewritten per app.
 
 ## 3. Architectural Invariants
 

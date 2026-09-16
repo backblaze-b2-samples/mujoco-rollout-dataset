@@ -11,8 +11,6 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -33,6 +31,7 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { DangerZone } from "./danger-zone";
+import { ENVIRONMENTS, RESOLUTIONS } from "@/lib/rollout-options";
 import {
   DEFAULT_THEME,
   THEME_OPTIONS,
@@ -45,31 +44,22 @@ import {
 } from "@/lib/demo-preferences";
 
 // This page is a SHOWCASE. Theme is the one preference the app genuinely
-// honours (owned by next-themes, applied for real). Everything else — the
-// Profile fields and the notification / quota / default-view preferences — is a
-// deliberate DEMO: it shows what a settings page can look like when you adapt
-// the kit, without pretending the kit ships the backend (account system,
-// mailer, quota service, activity log) that would make them do anything. A
-// banner says so, and the demo values persist to localStorage only. This used
-// to mislead: the same fields toasted "Settings saved" with no hint they were
-// inert. See docs/features/settings.md.
+// honours (owned by next-themes, applied for real). The rollout preferences are
+// a deliberate DEMO: they show what a preferences page can look like when you
+// adapt the kit, without pretending the New-rollout form reads them back yet. A
+// banner says so, and the demo values persist to localStorage only.
 const settingsSchema = z.object({
-  displayName: z
-    .string()
-    .min(2, "Display name must be at least 2 characters")
-    .max(50),
-  bio: z.string().max(160, "Bio must be 160 characters or fewer").optional(),
-  theme: z.enum(THEME_OPTIONS),
-  defaultView: z.enum(["tree", "list", "grid"]),
-  emailOnUpload: z.boolean(),
-  warnNearQuota: z.boolean(),
-  quotaThreshold: z
+  defaultEnvironment: z.string().min(1),
+  defaultResolution: z.enum(RESOLUTIONS),
+  defaultEpisodeCount: z
     .string()
     .regex(/^\d+$/, "Must be a number")
     .refine((v) => {
       const n = Number(v);
-      return n >= 50 && n <= 95;
-    }, "Must be between 50 and 95"),
+      return n >= 1 && n <= 100;
+    }, "Must be between 1 and 100"),
+  notifyOnComplete: z.boolean(),
+  theme: z.enum(THEME_OPTIONS),
 });
 
 type SettingsValues = z.infer<typeof settingsSchema>;
@@ -91,9 +81,7 @@ export function SettingsForm() {
     defaultValues,
   });
 
-  // Hydrate once, after next-themes has resolved the active theme on the client
-  // (it is undefined during the first paint). Theme comes from next-themes; the
-  // demo fields come from their own localStorage blob.
+  // Hydrate once, after next-themes has resolved the active theme on the client.
   useEffect(() => {
     if (hydratedRef.current || theme === undefined) return;
     hydratedRef.current = true;
@@ -109,16 +97,15 @@ export function SettingsForm() {
     setTheme(values.theme);
     // The rest is the demo: persisted locally only, never sent anywhere.
     const { theme: _theme, ...demo } = values;
-    const stored = saveDemoPreferences({ ...demo, bio: demo.bio ?? "" });
+    const stored = saveDemoPreferences(demo);
     setSubmitting(false);
 
     if (stored) {
       toast.success("Preferences saved in this browser", {
         description:
-          "Theme is applied now. Profile and the other preferences are a demo — stored locally, not sent anywhere.",
+          "Theme is applied now. Rollout defaults are a demo — stored locally, not read back into the form yet.",
       });
     } else {
-      // Honest: don't claim a save that didn't happen.
       toast.warning("Theme applied; demo preferences not stored", {
         description:
           "Your browser blocked local storage, so the demo values won't persist. Theme still changed.",
@@ -129,74 +116,125 @@ export function SettingsForm() {
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-        {/* The one thing the old page was missing: say plainly what is real. */}
         <Alert>
           <FlaskConical />
           <AlertTitle>Most of this page is a demonstration</AlertTitle>
           <AlertDescription>
             <span>
-              It shows what a settings page can look like when you build on this
-              starter kit. Only <strong>Theme</strong> is wired up for real. The
-              Profile fields and the notification, quota, and default-view
-              preferences are illustrative placeholders — they save to this
-              browser but drive no behaviour, because the kit ships no account
-              system, mailer, quota service, or activity log. Point them at your
-              own API when you add one. See{" "}
+              It shows what a preferences page can look like when you build on this starter kit. Only{" "}
+              <strong>Theme</strong> is wired up for real. The rollout defaults below are
+              illustrative placeholders — they save to this browser but the New-rollout form does not
+              read them back yet. Wire them into your own preferences API when you add one. See{" "}
               <code>docs/features/settings.md</code>.
             </span>
           </AlertDescription>
         </Alert>
 
-        {/* Profile (demo) */}
+        {/* Rollout defaults (demo) */}
         <Card>
           <CardHeader className="border-b border-border py-4 px-5">
-            <CardTitle className="card-title">Profile</CardTitle>
+            <CardTitle className="card-title">Rollout defaults</CardTitle>
           </CardHeader>
-          <CardContent className="p-5 space-y-4">
+          <CardContent className="p-5 space-y-6">
             <FormField
               control={form.control}
-              name="displayName"
+              name="defaultEnvironment"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Display name</FormLabel>
-                  <FormControl>
-                    <Input placeholder="Your name" {...field} />
-                  </FormControl>
+                  <FormLabel>Default environment</FormLabel>
+                  <Select onValueChange={field.onChange} value={field.value}>
+                    <FormControl>
+                      <SelectTrigger className="w-72">
+                        <SelectValue />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {ENVIRONMENTS.map((env) => (
+                        <SelectItem key={env.value} value={env.value}>
+                          {env.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                   <FormDescription>
-                    Demo field. In a real build this might appear in activity
-                    logs or share links.
+                    Demo field. The environment a new rollout would start from.
                   </FormDescription>
                   <FormMessage />
                 </FormItem>
               )}
             />
+
             <FormField
               control={form.control}
-              name="bio"
+              name="defaultResolution"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Bio</FormLabel>
+                  <FormLabel>Default resolution</FormLabel>
+                  <Select onValueChange={field.onChange} value={field.value}>
+                    <FormControl>
+                      <SelectTrigger className="w-40">
+                        <SelectValue />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {RESOLUTIONS.map((r) => (
+                        <SelectItem key={r} value={r}>
+                          {r}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormDescription>Demo field. Lower renders faster.</FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="defaultEpisodeCount"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Default episode count</FormLabel>
                   <FormControl>
-                    <Textarea
-                      placeholder="A short description of this workspace"
-                      className="resize-none"
+                    <Input
+                      type="number"
+                      min={1}
+                      max={100}
+                      className="w-32 font-mono tabular-nums"
                       {...field}
                     />
                   </FormControl>
-                  <FormDescription>
-                    Demo field. Max 160 characters.
-                  </FormDescription>
+                  <FormDescription>Demo field. Between 1 and 100.</FormDescription>
                   <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="notifyOnComplete"
+              render={({ field }) => (
+                <FormItem className="flex flex-row items-center justify-between rounded-md border border-border p-3">
+                  <div className="space-y-0.5">
+                    <FormLabel>Notify me when a rollout completes</FormLabel>
+                    <FormDescription>
+                      Demo field. A real build would push a toast or email when a run finishes.
+                    </FormDescription>
+                  </div>
+                  <FormControl>
+                    <Switch checked={field.value} onCheckedChange={field.onChange} />
+                  </FormControl>
                 </FormItem>
               )}
             />
           </CardContent>
         </Card>
 
-        {/* Preferences */}
+        {/* Appearance */}
         <Card>
           <CardHeader className="border-b border-border py-4 px-5">
-            <CardTitle className="card-title">Preferences</CardTitle>
+            <CardTitle className="card-title">Appearance</CardTitle>
           </CardHeader>
           <CardContent className="p-5 space-y-6">
             <FormField
@@ -223,101 +261,7 @@ export function SettingsForm() {
                     </RadioGroup>
                   </FormControl>
                   <FormDescription>
-                    Applied for real when you save. The header toggle changes it
-                    too.
-                  </FormDescription>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="defaultView"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Default file view</FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value}>
-                    <FormControl>
-                      <SelectTrigger className="w-60">
-                        <SelectValue />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      <SelectItem value="tree">Tree</SelectItem>
-                      <SelectItem value="list">List</SelectItem>
-                      <SelectItem value="grid">Grid</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <FormDescription>
-                    Demo field. Only the tree view ships today; List and Grid are
-                    placeholders for you to build.
-                  </FormDescription>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="emailOnUpload"
-              render={({ field }) => (
-                <FormItem className="flex flex-row items-center justify-between rounded-md border border-border p-3">
-                  <div className="space-y-0.5">
-                    <FormLabel>Email me on every upload</FormLabel>
-                    <FormDescription>
-                      Demo field. A real build would send a receipt per upload.
-                    </FormDescription>
-                  </div>
-                  <FormControl>
-                    <Switch
-                      checked={field.value}
-                      onCheckedChange={field.onChange}
-                    />
-                  </FormControl>
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="warnNearQuota"
-              render={({ field }) => (
-                <FormItem className="flex flex-row items-start gap-3">
-                  <FormControl>
-                    <Checkbox
-                      checked={field.value}
-                      onCheckedChange={field.onChange}
-                    />
-                  </FormControl>
-                  <div className="grid gap-1.5 leading-none">
-                    <FormLabel>Warn me when approaching quota</FormLabel>
-                    <FormDescription>
-                      Demo field. Would show a banner once usage crosses your
-                      threshold.
-                    </FormDescription>
-                  </div>
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="quotaThreshold"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Quota warning threshold (%)</FormLabel>
-                  <FormControl>
-                    <Input
-                      type="number"
-                      min={50}
-                      max={95}
-                      className="w-32 font-mono tabular-nums"
-                      {...field}
-                    />
-                  </FormControl>
-                  <FormDescription>
-                    Demo field. Between 50 and 95.
+                    Applied for real when you save. The header toggle changes it too.
                   </FormDescription>
                   <FormMessage />
                 </FormItem>
@@ -333,9 +277,7 @@ export function SettingsForm() {
           <Button
             type="button"
             variant="outline"
-            onClick={() =>
-              form.reset({ ...DEMO_PREFERENCES_DEFAULTS, theme: DEFAULT_THEME })
-            }
+            onClick={() => form.reset({ ...DEMO_PREFERENCES_DEFAULTS, theme: DEFAULT_THEME })}
           >
             Reset
           </Button>

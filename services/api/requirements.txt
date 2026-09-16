@@ -9,8 +9,13 @@ python-dotenv>=1.0.0
 pydantic>=2.10.0
 pydantic-settings>=2.7.0
 boto3>=1.35.0
-Pillow>=11.0.0
-PyPDF2>=3.0.0
+
+# The MuJoCo Playground rollout + render engine (jax, mujoco, mujoco-mjx,
+# numpy, imageio) is NOT here on purpose — it is a heavy, platform-specific
+# stack that would make the baseline install slow and fragile. It lives in the
+# gated requirements-ml.txt, is lazy-imported in app/service/mujoco_engine.py,
+# and a run degrades to an actionable error when it is absent. See
+# docs/features/policy-rollout.md.
 
 # Dev / quality
 ruff>=0.8.0

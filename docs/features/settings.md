@@ -1,21 +1,21 @@
-<!-- last_verified: 2026-07-28 -->
+<!-- last_verified: 2026-09-16 -->
 # Feature: Settings
 
 ## Purpose
-Show what a settings page can look like when you build on this starter kit — a
-profile, notification/quota preferences, and a default view — while being
-explicit that only the preferences the kit can actually honour do anything. Today
-that is Theme; the rest is a labelled demonstration.
+Show what a preferences page can look like when you build on this starter kit — a
+set of rollout defaults — while being explicit that only the preferences the app
+can actually honour do anything. Today that is Theme; the rest is a labelled
+demonstration.
 
 ## Used By
 - UI: `/settings` page (`SettingsForm`, `DangerZone`)
-- API: none. There is no account system
-- Storage: `next-themes`' own key for Theme; `localStorage` (`vibe-demo-preferences`) for the demo fields. The app has no server-side preferences store
+- API: none. There is no server-side preferences store
+- Storage: `next-themes`' own key for Theme; `localStorage` (`mujoco-rollout-dataset-demo-preferences`) for the demo fields
 
 ## Core Functions
 - `apps/web/src/lib/theme-preference.ts` — `THEME_OPTIONS`, `DEFAULT_THEME`, `isThemeOption()`, `normalizeTheme()`; the one real preference
-- `apps/web/src/lib/demo-preferences.ts` — `DemoPreferences`, `DEMO_PREFERENCES_DEFAULTS`, `loadDemoPreferences()`, `saveDemoPreferences()`; localStorage persistence for the illustrative fields
-- `apps/web/src/components/settings/settings-form.tsx` — the form; a demo banner, the real Theme control, and the demo Profile/Preferences fields
+- `apps/web/src/lib/demo-preferences.ts` — `DemoPreferences`, `DEMO_PREFERENCES_DEFAULTS`, `loadDemoPreferences()`, `saveDemoPreferences()`; localStorage persistence for the illustrative rollout defaults
+- `apps/web/src/components/settings/settings-form.tsx` — the form; a demo banner, the real Theme control, and the demo rollout-default fields
 - `apps/web/src/components/layout/theme-provider.tsx` — `next-themes` provider (the single owner of the theme)
 - `apps/web/src/components/settings/danger-zone.tsx` — destructive bucket actions (demo — no real delete runs)
 
@@ -25,11 +25,11 @@ that is Theme; the rest is a labelled demonstration.
 
 ## Inputs
 - theme: `"light" | "dark" | "system"` (real)
-- displayName, bio, defaultView (`tree | list | grid`), emailOnUpload, warnNearQuota, quotaThreshold (demo)
+- defaultEnvironment, defaultResolution (`240p | 480p | 720p`), defaultEpisodeCount, notifyOnComplete (demo)
 
 ## Outputs
 - Side effect (real): theme applied immediately via `setTheme()`, persisted under `next-themes`' key
-- Side effect (demo): the other fields written to `localStorage` only, never sent anywhere
+- Side effect (demo): the rollout defaults written to `localStorage` only, never sent anywhere and not yet read back into the New-rollout form
 - Toast: success naming that theme was applied and the demo values were stored in this browser; a warning toast instead when the browser blocks storage (theme still changes)
 
 ## Flow
@@ -49,31 +49,27 @@ The page is a **showcase**, so it deliberately keeps illustrative controls, but
 it must never let a demo control *look* real:
 
 - A banner at the top states plainly that only Theme is wired up, and that the
-  Profile / notification / quota / default-view fields are placeholders that
-  save to the browser but drive no behaviour.
+  rollout-default fields are placeholders that save to the browser but the
+  New-rollout form does not read them back yet.
 - Every demo field's description says "Demo field."
 - The save toast distinguishes the real theme change from the locally-stored
   demo values, and never claims a save that did not happen.
 
-This is the fix for the original defect: the same fields used to persist nothing
-and toast "Settings saved", i.e. the app reported success for behaviour that
-could never happen, with no hint the controls were inert. Keep the showcase, but
-keep it honest. When you make one of these real, wire it to its backing surface
-(a mailer, a quota banner, an activity log / share link, real List and Grid
-views plus a switcher) and drop the "Demo field" wording in the same change.
+When you make one of these real, wire it to its backing surface — read the stored
+defaults into `rollout-form.tsx` when the New-rollout dialog opens — and drop the
+"Demo field" wording in the same change.
 
 ## UX States
 - Loading: the form shows defaults for one frame, then resets to the live theme + stored demo values
 - Saved: success toast (theme applied + demo values stored locally)
 - Storage blocked: warning toast (theme applied, demo values not persisted)
-- Invalid: inline field errors (e.g. display name < 2 chars, quota threshold outside 50–95)
+- Invalid: inline field errors (e.g. default episode count outside 1–100)
 
 ## Verification
 - Test files: `apps/web/src/lib/theme-preference.test.ts`, `apps/web/src/lib/demo-preferences.test.ts`
 - Required cases: the offered theme set is exactly what `setTheme()` accepts and unknown values fall back to `system`; demo preferences round-trip through localStorage, fall back field-by-field on a partial/corrupt blob, and report `false` when storage is unavailable
 - Focused verify command: `pnpm test:web`
 - Default pre-PR verify command: `pnpm verify`
-- Full local verify command: `pnpm verify:full` when the E2E/live prerequisites in [Verification](../verification.md#non-live-verification) are available
 - Pass criteria: focused tests and `pnpm verify` green; saving theme = dark leaves `html.class="dark"` and survives a reload; the demo banner is present and every demo field is labelled as such
 
 ## Related Docs

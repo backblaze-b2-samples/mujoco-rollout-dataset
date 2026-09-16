@@ -39,6 +39,200 @@
         "title": "DeleteFileResponse",
         "type": "object"
       },
+      "Episode": {
+        "description": "One rendered episode plus fresh presigned URLs for its artifacts.",
+        "properties": {
+          "action_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Presigned GET for action.npy.",
+            "title": "Action Url"
+          },
+          "episode_id": {
+            "title": "Episode Id",
+            "type": "string"
+          },
+          "length": {
+            "description": "Number of simulation steps in the episode.",
+            "title": "Length",
+            "type": "integer"
+          },
+          "policy_checkpoint_hash": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "SHA-256 of the policy checkpoint, or null for the random policy.",
+            "title": "Policy Checkpoint Hash"
+          },
+          "reward_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Presigned GET for reward.npy.",
+            "title": "Reward Url"
+          },
+          "state_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Presigned GET for state.npy.",
+            "title": "State Url"
+          },
+          "success": {
+            "title": "Success",
+            "type": "boolean"
+          },
+          "summary_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Presigned GET for summary.json.",
+            "title": "Summary Url"
+          },
+          "total_reward": {
+            "title": "Total Reward",
+            "type": "number"
+          },
+          "video_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Presigned GET for the rendered MP4 (or PNG-sequence ZIP).",
+            "title": "Video Url"
+          }
+        },
+        "required": [
+          "episode_id",
+          "total_reward",
+          "length",
+          "success",
+          "policy_checkpoint_hash",
+          "video_url",
+          "state_url",
+          "action_url",
+          "reward_url",
+          "summary_url"
+        ],
+        "title": "Episode",
+        "type": "object"
+      },
+      "EpisodeAssets": {
+        "description": "Freshly minted presigned GET URLs for one episode's artifacts.",
+        "properties": {
+          "action_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Action Url"
+          },
+          "reward_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reward Url"
+          },
+          "state_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "State Url"
+          },
+          "summary_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Summary Url"
+          },
+          "video_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Video Url"
+          }
+        },
+        "required": [
+          "video_url",
+          "state_url",
+          "action_url",
+          "reward_url",
+          "summary_url"
+        ],
+        "title": "EpisodeAssets",
+        "type": "object"
+      },
+      "EpisodeList": {
+        "description": "Every episode belonging to a rollout.",
+        "properties": {
+          "episodes": {
+            "items": {
+              "$ref": "#/components/schemas/Episode"
+            },
+            "title": "Episodes",
+            "type": "array"
+          }
+        },
+        "required": [
+          "episodes"
+        ],
+        "title": "EpisodeList",
+        "type": "object"
+      },
       "FileMetadata": {
         "description": "One stored object as the file list and the by-key metadata route see it.",
         "properties": {
@@ -280,71 +474,6 @@
         "title": "FileMetadataDetail",
         "type": "object"
       },
-      "FileUploadResponse": {
-        "description": "The stored object as `POST /upload/verify` reports it back.",
-        "properties": {
-          "content_type": {
-            "title": "Content Type",
-            "type": "string"
-          },
-          "filename": {
-            "title": "Filename",
-            "type": "string"
-          },
-          "key": {
-            "title": "Key",
-            "type": "string"
-          },
-          "metadata": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/FileMetadataDetail"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "Rich metadata, when extraction succeeded for this type."
-          },
-          "size_bytes": {
-            "title": "Size Bytes",
-            "type": "integer"
-          },
-          "size_human": {
-            "title": "Size Human",
-            "type": "string"
-          },
-          "uploaded_at": {
-            "format": "date-time",
-            "title": "Uploaded At",
-            "type": "string"
-          },
-          "url": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "Public object URL when the bucket is public, else null.",
-            "title": "Url"
-          }
-        },
-        "required": [
-          "key",
-          "filename",
-          "size_bytes",
-          "size_human",
-          "content_type",
-          "uploaded_at",
-          "url",
-          "metadata"
-        ],
-        "title": "FileUploadResponse",
-        "type": "object"
-      },
       "FileUrlResponse": {
         "description": "A short-lived presigned GET for downloading or previewing one object.",
         "properties": {
@@ -394,71 +523,493 @@
         "title": "HealthStatus",
         "type": "object"
       },
-      "PresignUploadRequest": {
-        "description": "What the browser declares before uploading directly to B2.",
+      "Rollout": {
+        "description": "A configured rollout job and its run status.",
         "properties": {
-          "content_type": {
-            "title": "Content Type",
+          "camera": {
+            "enum": [
+              "side",
+              "track",
+              "front"
+            ],
+            "title": "Camera",
             "type": "string"
           },
-          "filename": {
-            "title": "Filename",
+          "checkpoint_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "B2 key of an uploaded policy checkpoint; null for the built-in random policy.",
+            "title": "Checkpoint Key"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
             "type": "string"
           },
-          "size_bytes": {
-            "title": "Size Bytes",
+          "environment": {
+            "description": "MuJoCo Playground environment name, e.g. CartpoleBalance.",
+            "title": "Environment",
+            "type": "string"
+          },
+          "episode_count": {
+            "title": "Episode Count",
             "type": "integer"
+          },
+          "episode_count_done": {
+            "description": "Episodes rendered and written to B2 so far.",
+            "title": "Episode Count Done",
+            "type": "integer"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "key_prefix": {
+            "description": "B2 prefix under which this rollout's artifacts live.",
+            "title": "Key Prefix",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "output_format": {
+            "enum": [
+              "mp4",
+              "png_sequence"
+            ],
+            "title": "Output Format",
+            "type": "string"
+          },
+          "policy": {
+            "enum": [
+              "random",
+              "checkpoint"
+            ],
+            "title": "Policy",
+            "type": "string"
+          },
+          "resolution": {
+            "enum": [
+              "240p",
+              "480p",
+              "720p"
+            ],
+            "title": "Resolution",
+            "type": "string"
+          },
+          "seed": {
+            "title": "Seed",
+            "type": "integer"
+          },
+          "status": {
+            "enum": [
+              "draft",
+              "running",
+              "complete",
+              "failed"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "total_reward": {
+            "default": 0.0,
+            "description": "Cumulative reward summed across every rendered episode.",
+            "title": "Total Reward",
+            "type": "number"
           }
         },
         "required": [
-          "filename",
-          "content_type",
-          "size_bytes"
+          "id",
+          "name",
+          "environment",
+          "episode_count",
+          "resolution",
+          "camera",
+          "output_format",
+          "seed",
+          "policy",
+          "checkpoint_key",
+          "status",
+          "created_at",
+          "episode_count_done",
+          "total_reward",
+          "key_prefix"
         ],
-        "title": "PresignUploadRequest",
+        "title": "Rollout",
         "type": "object"
       },
-      "PresignUploadResponse": {
-        "description": "A short-lived presigned PUT the browser uploads to, plus the exact\nheaders it must send. `Content-Length` and `content-type` are signed into\nthe URL, so B2 rejects a body of any other size or type.",
+      "RolloutCreate": {
+        "description": "New-rollout request. Finite fields default to the small, fast demo preset.",
         "properties": {
-          "content_type": {
-            "title": "Content Type",
+          "camera": {
+            "default": "side",
+            "enum": [
+              "side",
+              "track",
+              "front"
+            ],
+            "title": "Camera",
             "type": "string"
           },
-          "expires_in": {
-            "title": "Expires In",
+          "checkpoint_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Checkpoint Key"
+          },
+          "environment": {
+            "default": "CartpoleBalance",
+            "minLength": 1,
+            "title": "Environment",
+            "type": "string"
+          },
+          "episode_count": {
+            "default": 2,
+            "maximum": 100.0,
+            "minimum": 1.0,
+            "title": "Episode Count",
             "type": "integer"
           },
-          "headers": {
-            "additionalProperties": {
-              "type": "string"
+          "name": {
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          },
+          "output_format": {
+            "default": "mp4",
+            "enum": [
+              "mp4",
+              "png_sequence"
+            ],
+            "title": "Output Format",
+            "type": "string"
+          },
+          "policy": {
+            "default": "random",
+            "enum": [
+              "random",
+              "checkpoint"
+            ],
+            "title": "Policy",
+            "type": "string"
+          },
+          "resolution": {
+            "default": "240p",
+            "enum": [
+              "240p",
+              "480p",
+              "720p"
+            ],
+            "title": "Resolution",
+            "type": "string"
+          },
+          "seed": {
+            "default": 0,
+            "minimum": 0.0,
+            "title": "Seed",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "title": "RolloutCreate",
+        "type": "object"
+      },
+      "RolloutDeleteResult": {
+        "description": "Acknowledgement that a rollout and all its B2 artifacts were removed.",
+        "properties": {
+          "deleted": {
+            "title": "Deleted",
+            "type": "boolean"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "objects_deleted": {
+            "description": "Number of B2 objects removed under the rollout prefix.",
+            "title": "Objects Deleted",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "deleted",
+          "id",
+          "objects_deleted"
+        ],
+        "title": "RolloutDeleteResult",
+        "type": "object"
+      },
+      "RolloutDetail": {
+        "description": "A rollout with its episodes expanded.",
+        "properties": {
+          "episodes": {
+            "items": {
+              "$ref": "#/components/schemas/Episode"
             },
-            "description": "Signed into the URL, so the browser must send them verbatim \u2014 B2 answers a mismatch with 403.",
-            "title": "Headers",
-            "type": "object"
+            "title": "Episodes",
+            "type": "array"
           },
-          "key": {
-            "title": "Key",
-            "type": "string"
+          "rollout": {
+            "$ref": "#/components/schemas/Rollout"
+          }
+        },
+        "required": [
+          "rollout",
+          "episodes"
+        ],
+        "title": "RolloutDetail",
+        "type": "object"
+      },
+      "RolloutList": {
+        "description": "A page of rollouts, newest first.",
+        "properties": {
+          "cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Opaque continuation token; null when there are no more rollouts.",
+            "title": "Cursor"
           },
-          "method": {
-            "title": "Method",
-            "type": "string"
+          "rollouts": {
+            "items": {
+              "$ref": "#/components/schemas/Rollout"
+            },
+            "title": "Rollouts",
+            "type": "array"
+          }
+        },
+        "required": [
+          "rollouts",
+          "cursor"
+        ],
+        "title": "RolloutList",
+        "type": "object"
+      },
+      "RolloutRunRequest": {
+        "description": "Optional per-run overrides for `POST /rollouts/{id}/run`.",
+        "properties": {
+          "episode_count": {
+            "anyOf": [
+              {
+                "maximum": 100.0,
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Episode Count"
           },
-          "url": {
-            "title": "Url",
+          "seed": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Seed"
+          }
+        },
+        "title": "RolloutRunRequest",
+        "type": "object"
+      },
+      "RolloutRunResult": {
+        "description": "The outcome of a rollout run: the updated rollout and its new episodes.\n\n`status` is `complete` when every episode rendered and streamed to B2, or\n`failed` when the run could not run (e.g. the MuJoCo engine is not installed\non this host \u2014 the app persists the failure rather than returning a 500).",
+        "properties": {
+          "episodes": {
+            "items": {
+              "$ref": "#/components/schemas/Episode"
+            },
+            "title": "Episodes",
+            "type": "array"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Human-readable detail, set on a failed run.",
+            "title": "Message"
+          },
+          "rollout": {
+            "$ref": "#/components/schemas/Rollout"
+          },
+          "status": {
+            "enum": [
+              "draft",
+              "running",
+              "complete",
+              "failed"
+            ],
+            "title": "Status",
             "type": "string"
           }
         },
         "required": [
-          "key",
-          "url",
-          "method",
-          "content_type",
-          "headers",
-          "expires_in"
+          "rollout",
+          "episodes",
+          "status",
+          "message"
         ],
-        "title": "PresignUploadResponse",
+        "title": "RolloutRunResult",
+        "type": "object"
+      },
+      "RolloutUpdate": {
+        "description": "Partial update of a draft rollout's config. Every field is optional.",
+        "properties": {
+          "camera": {
+            "anyOf": [
+              {
+                "enum": [
+                  "side",
+                  "track",
+                  "front"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Camera"
+          },
+          "checkpoint_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Checkpoint Key"
+          },
+          "environment": {
+            "anyOf": [
+              {
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Environment"
+          },
+          "episode_count": {
+            "anyOf": [
+              {
+                "maximum": 100.0,
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Episode Count"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "maxLength": 120,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "output_format": {
+            "anyOf": [
+              {
+                "enum": [
+                  "mp4",
+                  "png_sequence"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Output Format"
+          },
+          "policy": {
+            "anyOf": [
+              {
+                "enum": [
+                  "random",
+                  "checkpoint"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Policy"
+          },
+          "resolution": {
+            "anyOf": [
+              {
+                "enum": [
+                  "240p",
+                  "480p",
+                  "720p"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resolution"
+          },
+          "seed": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Seed"
+          }
+        },
+        "title": "RolloutUpdate",
         "type": "object"
       },
       "UploadStats": {
@@ -534,26 +1085,12 @@
         ],
         "title": "ValidationError",
         "type": "object"
-      },
-      "VerifyUploadRequest": {
-        "description": "Sent after the direct PUT so the API can inspect the stored object.",
-        "properties": {
-          "key": {
-            "title": "Key",
-            "type": "string"
-          }
-        },
-        "required": [
-          "key"
-        ],
-        "title": "VerifyUploadRequest",
-        "type": "object"
       }
     }
   },
   "info": {
-    "description": "Local API for the Vibe Coding Starter Kit template, providing file upload and management backed by Backblaze B2. This contract documents the template's local API, not a hosted public endpoint.",
-    "title": "Vibe Coding Starter Kit API",
+    "description": "Local API for MuJoCo Rollout Dataset: it configures and runs MuJoCo Playground policy rollouts, renders each episode to video, and streams the rendered video and per-step trajectory arrays to Backblaze B2. This contract documents the app's local API, not a hosted public endpoint.",
+    "title": "MuJoCo Rollout Dataset API",
     "version": "0.1.0"
   },
   "openapi": "3.1.0",
@@ -1102,26 +1639,43 @@
         ]
       }
     },
-    "/upload/presign": {
-      "post": {
-        "description": "Validate a declared upload and hand back a presigned PUT.\n\nThe browser uploads the bytes straight to B2 with the returned URL, so they\nnever traverse this Function \u2014 that is what lifts Vercel's ~4.5 MB payload\nceiling. Size and content-type are signed into the URL (see the service).",
-        "operationId": "presign_upload_upload_presign_post",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/PresignUploadRequest"
-              }
+    "/rollouts": {
+      "get": {
+        "operationId": "list_rollouts_endpoint_rollouts_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "title": "Limit",
+              "type": "integer"
             }
           },
-          "required": true
-        },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/PresignUploadResponse"
+                  "$ref": "#/components/schemas/RolloutList"
                 }
               }
             },
@@ -1138,32 +1692,71 @@
             "description": "Validation Error"
           }
         },
-        "summary": "Presign Upload",
+        "summary": "List Rollouts Endpoint",
         "tags": [
-          "upload"
+          "rollouts"
+        ]
+      },
+      "post": {
+        "operationId": "create_rollout_endpoint_rollouts_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RolloutCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Rollout"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Rollout Endpoint",
+        "tags": [
+          "rollouts"
         ]
       }
     },
-    "/upload/verify": {
-      "post": {
-        "description": "Confirm an object just uploaded directly to B2 is valid and visible.",
-        "operationId": "verify_upload_route_upload_verify_post",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/VerifyUploadRequest"
-              }
+    "/rollouts/{rollout_id}": {
+      "delete": {
+        "operationId": "delete_rollout_endpoint_rollouts__rollout_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "rollout_id",
+            "required": true,
+            "schema": {
+              "title": "Rollout Id",
+              "type": "string"
             }
-          },
-          "required": true
-        },
+          }
+        ],
         "responses": {
           "200": {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/FileUploadResponse"
+                  "$ref": "#/components/schemas/RolloutDeleteResult"
                 }
               }
             },
@@ -1180,9 +1773,251 @@
             "description": "Validation Error"
           }
         },
-        "summary": "Verify Upload Route",
+        "summary": "Delete Rollout Endpoint",
         "tags": [
-          "upload"
+          "rollouts"
+        ]
+      },
+      "get": {
+        "operationId": "get_rollout_endpoint_rollouts__rollout_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "rollout_id",
+            "required": true,
+            "schema": {
+              "title": "Rollout Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RolloutDetail"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Rollout Endpoint",
+        "tags": [
+          "rollouts"
+        ]
+      },
+      "patch": {
+        "operationId": "update_rollout_endpoint_rollouts__rollout_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "rollout_id",
+            "required": true,
+            "schema": {
+              "title": "Rollout Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RolloutUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Rollout"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Rollout Endpoint",
+        "tags": [
+          "rollouts"
+        ]
+      }
+    },
+    "/rollouts/{rollout_id}/episodes": {
+      "get": {
+        "operationId": "list_episodes_endpoint_rollouts__rollout_id__episodes_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "rollout_id",
+            "required": true,
+            "schema": {
+              "title": "Rollout Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EpisodeList"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Episodes Endpoint",
+        "tags": [
+          "rollouts"
+        ]
+      }
+    },
+    "/rollouts/{rollout_id}/episodes/{episode_id}/assets": {
+      "get": {
+        "operationId": "episode_assets_endpoint_rollouts__rollout_id__episodes__episode_id__assets_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "rollout_id",
+            "required": true,
+            "schema": {
+              "title": "Rollout Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "episode_id",
+            "required": true,
+            "schema": {
+              "title": "Episode Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EpisodeAssets"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Episode Assets Endpoint",
+        "tags": [
+          "rollouts"
+        ]
+      }
+    },
+    "/rollouts/{rollout_id}/run": {
+      "post": {
+        "operationId": "run_rollout_endpoint_rollouts__rollout_id__run_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "rollout_id",
+            "required": true,
+            "schema": {
+              "title": "Rollout Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/RolloutRunRequest"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Req"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RolloutRunResult"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Run Rollout Endpoint",
+        "tags": [
+          "rollouts"
         ]
       }
     }

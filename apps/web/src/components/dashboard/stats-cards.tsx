@@ -1,49 +1,46 @@
 "use client";
 
-import { FileIcon, HardDrive, Upload, Download } from "lucide-react";
+import { Bot, Film, HardDrive, Trophy } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ErrorState } from "@/components/ui/error-state";
 import { LoadingNotice } from "@/components/common/loading-notice";
-import { useFileStats } from "@/lib/queries";
+import { useFileStats, useRollouts } from "@/lib/queries";
 
 export function StatsCards() {
-  const { data: stats, isLoading, error, refetch } = useFileStats();
+  const rolloutsQuery = useRollouts();
+  const statsQuery = useFileStats();
 
-  // Surface fetch failures inline rather than rendering "0 files / 0 B" —
-  // that lies to the user about the bucket state when really the API is
-  // just unreachable.
-  if (error) {
+  // The bucket-stats error is the load-bearing one (a full listing failed);
+  // surface it inline rather than lying with zeroes.
+  if (statsQuery.error) {
     return (
       <Card>
         <CardContent className="p-0">
-          <ErrorState error={error} onRetry={() => refetch()} />
+          <ErrorState error={statsQuery.error} onRetry={() => statsQuery.refetch()} />
         </CardContent>
       </Card>
     );
   }
 
+  const rollouts = rolloutsQuery.data?.rollouts ?? [];
+  const totalEpisodes = rollouts.reduce((sum, r) => sum + r.episode_count_done, 0);
+  const cumulativeReward = rollouts.reduce((sum, r) => sum + r.total_reward, 0);
+  const isLoading = rolloutsQuery.isLoading || statsQuery.isLoading;
+
   const cards = [
-    { title: "Total Files", value: stats?.total_files ?? 0, icon: FileIcon },
-    { title: "Storage Used", value: stats?.total_size_human ?? "0 B", icon: HardDrive },
-    { title: "Uploads Today", value: stats?.uploads_today ?? 0, icon: Upload },
-    { title: "Total Downloads", value: stats?.total_downloads ?? 0, icon: Download },
+    { title: "Total Rollouts", value: rollouts.length, icon: Bot },
+    { title: "Episodes Rendered", value: totalEpisodes, icon: Film },
+    { title: "Cumulative Reward", value: cumulativeReward.toFixed(2), icon: Trophy },
+    { title: "B2 Storage Used", value: statsQuery.data?.total_size_human ?? "0 B", icon: HardDrive },
   ];
 
   return (
     <>
-      {/* Stats need a full bucket listing, which measured ~8s on a 16k-object
-          bucket. Four blank skeleton cards said nothing about that; this states
-          it in words and escalates if the wait keeps going. */}
-      {isLoading && (
-        <LoadingNotice className="mb-3" subject="bucket stats" />
-      )}
+      {isLoading && <LoadingNotice className="mb-3" subject="rollout stats" />}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {cards.map((card, i) => (
-          <Card
-            key={card.title}
-            className={`card-hover animate-fade-in-up stagger-${i + 1}`}
-          >
+          <Card key={card.title} className={`card-hover animate-fade-in-up stagger-${i + 1}`}>
             <CardHeader className="flex flex-row items-center justify-between pt-4 pb-2 px-4 space-y-0">
               <CardTitle className="text-xs font-semibold text-muted-foreground">
                 {card.title}

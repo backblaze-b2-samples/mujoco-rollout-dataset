@@ -1,14 +1,22 @@
 import type {
   DailyUploadCount,
   DeleteFileResponse,
+  EpisodeAssets,
+  EpisodeList,
   FileMetadata,
   FileMetadataDetail,
-  FileUploadResponse,
   FileUrlResponse,
   HealthStatus,
-  PresignUploadResponse,
+  Rollout,
+  RolloutCreate,
+  RolloutDeleteResult,
+  RolloutDetail,
+  RolloutList,
+  RolloutRunRequest,
+  RolloutRunResult,
+  RolloutUpdate,
   UploadStats,
-} from "@vibe-coding-starter-kit/shared";
+} from "@mujoco-rollout-dataset/shared";
 
 import { API_CLIENT_ROUTES } from "./generated/api-routes";
 
@@ -19,9 +27,9 @@ import { API_CLIENT_ROUTES } from "./generated/api-routes";
 // registry moved behind a generator.
 //
 // Everything else in this file is hand-written on purpose — error policy, base
-// URL resolution, the legacy-route fallback, the CORS diagnostics and the XHR
-// upload transport are per-app judgement the contract does not describe. See
-// `scripts/gen/api-gen.config.json` (`escapeHatch`).
+// URL resolution, the legacy-route fallback, the CORS diagnostics and the
+// per-entity request helpers are per-app judgement the contract does not
+// describe. See `scripts/gen/api-gen.config.json` (`escapeHatch`).
 export { API_CLIENT_ROUTES };
 
 // Single-origin deploys (Vercel `services`: one project serving web + API) put
@@ -78,32 +86,6 @@ function networkError(): ApiError {
   );
 }
 
-/**
- * Build the status-0 ApiError for a failed browser→B2 PUT.
- *
- * Deliberately not `networkError()`: these bytes never touch the API, so
- * "check the API logs" sends the developer to the one place that looks fine —
- * the presign that produced this URL succeeded and logged a clean 200.
- *
- * On a deployed origin the overwhelmingly likely cause is that the *bucket's*
- * CORS does not allow that origin, so the browser blocks the PUT before it
- * leaves and XHR reports only a contentless `error` event. Local dev rarely
- * trips it because localhost origins are usually already allowed — which is
- * exactly why it first appears immediately after a deploy. Name the cause and
- * the remedy instead of leaving a mystery.
- */
-function storageNetworkError(): ApiError {
-  if (typeof navigator !== "undefined" && navigator.onLine === false) {
-    return new ApiError("You appear to be offline — check your connection", 0);
-  }
-  return new ApiError(
-    "Couldn't upload to B2 storage. If this app is deployed, the bucket's CORS " +
-      "must allow this origin — run services/api/scripts/setup_b2_cors.py " +
-      "--origin <your origin>.",
-    0,
-  );
-}
-
 async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   let res: Response;
   try {
@@ -113,10 +95,7 @@ async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   }
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
-    throw new ApiError(
-      body.detail || `API error: ${res.status}`,
-      res.status,
-    );
+    throw new ApiError(body.detail || `API error: ${res.status}`, res.status);
   }
   return res.json();
 }
@@ -132,7 +111,7 @@ function isEndpointUnavailable(error: unknown): error is ApiError {
 async function apiFetchWithLegacyFallback<T>(
   path: string,
   legacyPath: () => string,
-  init?: RequestInit
+  init?: RequestInit,
 ): Promise<T> {
   try {
     return await apiFetch<T>(path, init);
@@ -144,6 +123,17 @@ async function apiFetchWithLegacyFallback<T>(
   }
 }
 
+/** Substitute `{name}` placeholders in a generated route path template. */
+function fillPath(template: string, params: Record<string, string>): string {
+  return template.replace(/\{(\w+)\}/g, (_match, key) => {
+    const value = params[key];
+    if (value === undefined || value === "") {
+      throw new ApiError(`Missing path parameter "${key}"`, 400);
+    }
+    return encodeURIComponent(value);
+  });
+}
+
 function fileKeyQuery(key: string): string {
   if (key.length === 0) {
     throw new ApiError("File key is required", 400);
@@ -153,7 +143,7 @@ function fileKeyQuery(key: string): string {
 
 function legacyFileKeyPath(
   key: string,
-  options: { blockRouteCollisions?: boolean } = {}
+  options: { blockRouteCollisions?: boolean } = {},
 ): string {
   if (!isLegacyPathFallbackSafe(key, options)) {
     throw new ApiError("Current API version required for this file key", 404);
@@ -170,14 +160,14 @@ function legacyFileKeyPath(
 function legacyFileKeyRoute(
   path: `${string}{key}${string}`,
   key: string,
-  options: { blockRouteCollisions?: boolean } = {}
+  options: { blockRouteCollisions?: boolean } = {},
 ): string {
   return path.replace("{key}", legacyFileKeyPath(key, options));
 }
 
 function isLegacyPathFallbackSafe(
   key: string,
-  { blockRouteCollisions = false }: { blockRouteCollisions?: boolean } = {}
+  { blockRouteCollisions = false }: { blockRouteCollisions?: boolean } = {},
 ): boolean {
   if (/(\.\.\/|\/\.\.|\\|%2e%2e|%00|\x00)/i.test(key)) return false;
   if (!blockRouteCollisions) return true;
@@ -188,13 +178,15 @@ function isLegacyPathFallbackSafe(
   return true;
 }
 
+// --- health + bucket explorer (kept from the starter) --------------------
+
 export async function getHealth() {
   return apiFetch<HealthStatus>(API_CLIENT_ROUTES.health.path);
 }
 
 export async function getFiles(prefix = "", limit = 100) {
   return apiFetch<FileMetadata[]>(
-    `${API_CLIENT_ROUTES.files.path}?prefix=${encodeURIComponent(prefix)}&limit=${limit}`
+    `${API_CLIENT_ROUTES.files.path}?prefix=${encodeURIComponent(prefix)}&limit=${limit}`,
   );
 }
 
@@ -204,7 +196,7 @@ export async function getFileStats() {
 
 export async function getUploadActivity(days = 7) {
   return apiFetch<DailyUploadCount[]>(
-    `${API_CLIENT_ROUTES.uploadActivity.path}?days=${days}`
+    `${API_CLIENT_ROUTES.uploadActivity.path}?days=${days}`,
   );
 }
 
@@ -214,27 +206,26 @@ export async function getFile(key: string) {
     () =>
       legacyFileKeyRoute(API_CLIENT_ROUTES.legacyFileMetadata.path, key, {
         blockRouteCollisions: true,
-      })
+      }),
   );
 }
 
 /**
- * Rich metadata (checksums, image/PDF fields) for an already-stored file.
+ * Format-agnostic metadata (checksums, size, MIME) for an already-stored file.
  * The server recomputes this on demand by downloading the object, so it's a
  * heavier call than getFile — fetch it lazily (only when the user asks to see
- * details). No legacy path fallback: this endpoint is new, so an older backend
- * wouldn't serve it under any route.
+ * details). No legacy path fallback: this endpoint is new.
  */
 export async function getFileDetail(key: string) {
   return apiFetch<FileMetadataDetail>(
-    `${API_CLIENT_ROUTES.fileByKeyDetail.path}?${fileKeyQuery(key)}`
+    `${API_CLIENT_ROUTES.fileByKeyDetail.path}?${fileKeyQuery(key)}`,
   );
 }
 
 export async function getDownloadUrl(key: string) {
   return apiFetchWithLegacyFallback<FileUrlResponse>(
     `${API_CLIENT_ROUTES.fileByKeyDownload.path}?${fileKeyQuery(key)}`,
-    () => legacyFileKeyRoute(API_CLIENT_ROUTES.legacyFileDownload.path, key)
+    () => legacyFileKeyRoute(API_CLIENT_ROUTES.legacyFileDownload.path, key),
   );
 }
 
@@ -242,7 +233,7 @@ export async function getDownloadUrl(key: string) {
 export async function getPreviewUrl(key: string) {
   return apiFetchWithLegacyFallback<FileUrlResponse>(
     `${API_CLIENT_ROUTES.fileByKeyPreview.path}?${fileKeyQuery(key)}`,
-    () => legacyFileKeyRoute(API_CLIENT_ROUTES.legacyFilePreview.path, key)
+    () => legacyFileKeyRoute(API_CLIENT_ROUTES.legacyFilePreview.path, key),
   );
 }
 
@@ -254,88 +245,70 @@ export async function deleteFile(key: string) {
       // Derived from the registry so the verb the contract test checks is the
       // verb actually sent — a hardcoded "DELETE" could silently disagree.
       method: API_CLIENT_ROUTES.fileByKeyDelete.method.toUpperCase(),
-    }
+    },
   );
 }
 
-/**
- * Upload a file directly to B2 in three steps: presign (the API validates the
- * declared file and signs a short-lived PUT), a direct browser→B2 PUT, then
- * verify (the API inspects the stored object). The bytes never pass through the
- * API, which is what removes Vercel's ~4.5 MB Function payload ceiling.
- *
- * The `(file, onProgress) => FileUploadResponse` signature is unchanged, so the
- * upload queue and progress UI don't care that the transport changed. Progress
- * tracks the browser→B2 leg; when it reaches 100% the queue enters its
- * server-side phase (see `upload-status`) while `verify` runs.
- */
-export async function uploadFile(
-  file: File,
-  onProgress?: (percent: number) => void
-): Promise<FileUploadResponse> {
-  const presign = await apiFetch<PresignUploadResponse>(
-    API_CLIENT_ROUTES.uploadPresign.path,
-    {
-      method: API_CLIENT_ROUTES.uploadPresign.method.toUpperCase(),
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        filename: file.name,
-        content_type: file.type,
-        size_bytes: file.size,
-      }),
-    }
-  );
+// --- rollouts (the primary entity) ---------------------------------------
 
-  await putFileToStorage(presign, file, onProgress);
+export async function listRollouts(limit = 50) {
+  return apiFetch<RolloutList>(`${API_CLIENT_ROUTES.rollouts.path}?limit=${limit}`);
+}
 
-  return apiFetch<FileUploadResponse>(API_CLIENT_ROUTES.uploadVerify.path, {
-    method: API_CLIENT_ROUTES.uploadVerify.method.toUpperCase(),
+export async function createRollout(payload: RolloutCreate) {
+  return apiFetch<Rollout>(API_CLIENT_ROUTES.rolloutCreate.path, {
+    method: API_CLIENT_ROUTES.rolloutCreate.method.toUpperCase(),
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ key: presign.key }),
+    body: JSON.stringify(payload),
   });
 }
 
-/**
- * PUT the raw file bytes to the presigned B2 URL. XHR (not fetch) because only
- * XHR exposes upload progress. The signed URL binds the exact size and
- * content-type, so `presign.headers` must be sent verbatim — B2 answers a
- * mismatch with 403.
- */
-function putFileToStorage(
-  presign: PresignUploadResponse,
-  file: File,
-  onProgress?: (percent: number) => void
-): Promise<void> {
-  return new Promise((resolve, reject) => {
-    const xhr = new XMLHttpRequest();
+export async function getRollout(id: string) {
+  return apiFetch<RolloutDetail>(
+    fillPath(API_CLIENT_ROUTES.rolloutDetail.path, { rollout_id: id }),
+  );
+}
 
-    xhr.upload.addEventListener("progress", (e) => {
-      if (e.lengthComputable && onProgress) {
-        onProgress(Math.round((e.loaded / e.total) * 100));
-      }
-    });
+export async function updateRollout(id: string, patch: RolloutUpdate) {
+  return apiFetch<Rollout>(
+    fillPath(API_CLIENT_ROUTES.rolloutUpdate.path, { rollout_id: id }),
+    {
+      method: API_CLIENT_ROUTES.rolloutUpdate.method.toUpperCase(),
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(patch),
+    },
+  );
+}
 
-    xhr.addEventListener("load", () => {
-      if (xhr.status >= 200 && xhr.status < 300) {
-        resolve();
-      } else {
-        // B2 errors are XML, not JSON — surface a stable message rather than
-        // the raw body (a 403 here means the signed size/type was violated).
-        reject(
-          new ApiError(`Upload to storage failed (${xhr.status})`, xhr.status)
-        );
-      }
-    });
+export async function deleteRollout(id: string) {
+  return apiFetch<RolloutDeleteResult>(
+    fillPath(API_CLIENT_ROUTES.rolloutDelete.path, { rollout_id: id }),
+    { method: API_CLIENT_ROUTES.rolloutDelete.method.toUpperCase() },
+  );
+}
 
-    xhr.addEventListener("error", () => reject(storageNetworkError()));
-    xhr.addEventListener("abort", () =>
-      reject(new ApiError("Upload aborted", 0)),
-    );
+export async function runRollout(id: string, req: RolloutRunRequest = {}) {
+  return apiFetch<RolloutRunResult>(
+    fillPath(API_CLIENT_ROUTES.rolloutRun.path, { rollout_id: id }),
+    {
+      method: API_CLIENT_ROUTES.rolloutRun.method.toUpperCase(),
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(req),
+    },
+  );
+}
 
-    xhr.open(presign.method.toUpperCase(), presign.url);
-    for (const [name, value] of Object.entries(presign.headers)) {
-      xhr.setRequestHeader(name, value);
-    }
-    xhr.send(file);
-  });
+export async function getEpisodes(id: string) {
+  return apiFetch<EpisodeList>(
+    fillPath(API_CLIENT_ROUTES.rolloutEpisodes.path, { rollout_id: id }),
+  );
+}
+
+export async function getEpisodeAssets(id: string, episodeId: string) {
+  return apiFetch<EpisodeAssets>(
+    fillPath(API_CLIENT_ROUTES.episodeAssets.path, {
+      rollout_id: id,
+      episode_id: episodeId,
+    }),
+  );
 }

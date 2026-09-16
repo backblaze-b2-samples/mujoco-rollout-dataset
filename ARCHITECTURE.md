@@ -4,17 +4,18 @@
 ## Components
 
 <!-- gen:begin arch-components -->
-A well-engineered full-stack foundation — dashboard, drag-and-drop upload and a file browser — with Backblaze B2 storage already wired in, so builders skip the boilerplate loop.
+A local pipeline that rolls out reinforcement-learning policies in MuJoCo Playground, renders each episode to video, and streams the rendered video plus per-step state, action and reward arrays and an episode-summary JSON to Backblaze B2 for offline policy analysis and behavioral-cloning dataset curation.
 
 - **apps/web/** — Next.js 16, React 19, Tailwind v4, shadcn/ui, TanStack Query, Recharts
-  - File Upload (`/upload`) — drag-and-drop upload with real-time progress
-  - File Browser (`/files`) — list, preview, download, delete files
-  - Dashboard (`/`) — stats cards, upload chart, recent uploads
-  - Settings (`/settings`) — theme plus labelled demo preference fields
-- **services/api/** — FastAPI, Python 3.12+, boto3, Pydantic v2, Pillow, PyPDF2
+  - Rollout Configuration (`/rollouts`) — create, edit, list and delete rollout jobs (environment, episode count, resolution, camera, policy)
+  - Dataset Explorer (`/dataset`) — browse rollouts and episodes, play rendered video and download trajectory arrays via presigned URLs
+  - Bucket Explorer (`/files`) — browse the full B2 bucket: list, preview, download, delete
+  - Dashboard (`/`) — rollout and episode stats, cumulative reward, storage used, recent rollouts
+- **services/api/** — FastAPI, Python 3.12+, boto3, Pydantic v2, MuJoCo Playground (mujoco + mujoco-mjx + jax), imageio
   - REST API for every operation the frontend consumes, exported to `docs/api/openapi.json`
   - Backblaze B2 (S3-compatible API) access isolated in the `repo/` layer
-  - Metadata Extraction — image dimensions, EXIF, PDF info, checksums
+  - Policy Rollout & Rendering — MuJoCo Playground rolls out a policy, records state/action/reward, and renders each episode to MP4 — runs locally, CPU by default
+  - B2 Dataset Write — per episode: MP4 + state/action/reward .npy + summary JSON streamed to B2
   - Structured JSON logging with request tracing, plus `/health` and Prometheus `/metrics`
 - **packages/shared/** — TypeScript types generated from the API contract by `pnpm gen:api`, consumed by `apps/web/` as a workspace dependency (pnpm workspaces)
 <!-- gen:end arch-components -->
@@ -84,12 +85,14 @@ services/api/
   share one origin — the web app at `/`, the API under `/api`. The repo-root
   `vercel.json` declares both services and routes `/api/*` to the API service;
   the Vercel-only `services/api/index.py` strips the `/api` prefix so FastAPI
-  keeps its native paths (`/health`, `/files`, …). Uploads go directly from the
-  browser to B2 via a presigned PUT (see
-  [File Upload](docs/features/file-upload.md)), so they bypass the Function's
-  4.5 MB payload ceiling entirely — the bucket must allow the deploy origin in
-  its CORS. A two-separate-Projects alternative and the full delivery contract
-  live in [infra/vercel/README.md](infra/vercel/README.md).
+  keeps its native paths (`/health`, `/files`, `/rollouts`, …). The MuJoCo
+  Playground render engine (native JAX/MJX) does not run on Vercel serverless,
+  so a Vercel deploy configures and browses rollouts while the render runs
+  locally or on a self-hosted API; rendered artifacts are served from B2 via
+  presigned GET (see [Policy Rollout & Rendering](docs/features/policy-rollout.md)),
+  and the bucket must allow the deploy origin in its CORS. A two-separate-Projects
+  alternative and the full delivery contract live in
+  [infra/vercel/README.md](infra/vercel/README.md).
 
 External provisioning and deployment remain explicit user-approved actions.
 
@@ -97,22 +100,21 @@ External provisioning and deployment remain explicit user-approved actions.
 
 <!-- gen:begin arch-data-stores -->
 - **Backblaze B2 (S3-compatible API)** — the only data store; there is no application database
-  - Every object this app writes lives under the `uploads/` key prefix of one bucket
+  - Every object this app writes lives under the `rollouts/` key prefix of one bucket
   - Listing, per-key metadata and presigned URLs all come from the S3 surface below
-  - The primary entity is `FileMetadata`; one file is one object
+  - The primary entity is `Rollout`; one rollout is one object
 <!-- gen:end arch-data-stores -->
 
 ## External Services
 
 <!-- gen:begin arch-external-services -->
 - **Backblaze B2 (S3-compatible API)** — reached only through `services/api/app/repo/`, using:
-  - `put_object` — store an uploaded object
-  - `presigned PUT` — the browser uploads bytes directly to B2, bypassing the Function payload cap
-  - `list_objects_v2` — the shared full-bucket listing behind the file list and the stats cards
-  - `head_object` — cheap per-key metadata, and the /health connectivity probe
-  - `get_object` — re-read bytes to recompute rich metadata on demand
-  - `presigned GET` — download and inline preview URLs
-  - `delete_object` — remove an object
+  - `put_object` — write rollout config JSON, rendered episode MP4, state/action/reward .npy arrays, and episode-summary JSON
+  - `list_objects_v2` — list rollouts and episodes under the rollouts/ prefix, and back the full-bucket explorer and dashboard stats
+  - `head_object` — the /health connectivity probe and cheap per-asset existence and size checks
+  - `get_object` — re-read episode-summary JSON and small arrays server-side
+  - `presigned GET` — inline playback of rendered MP4 and download of trajectory .npy arrays
+  - `delete_object` — delete a rollout and every artifact under its prefix
 <!-- gen:end arch-external-services -->
 
 ## Trust Boundaries
@@ -125,16 +127,17 @@ See [docs/SECURITY.md](docs/SECURITY.md) for full security documentation.
 
 ## Data Flows
 
-- **Upload**: Browser -> `POST /upload/presign` (API validates the declared file + signs a PUT) -> Browser PUTs bytes **directly to B2** -> `POST /upload/verify` (API HEADs + Range-sniffs the stored object) -> response
-- **List**: Browser -> `GET /files` -> service calls repo -> returns file list
-- **Download**: Browser -> `GET /files/{key}/download` -> service validates key -> repo generates presigned URL -> browser downloads
-- **Delete**: Browser -> `DELETE /files/{key}` -> service validates key -> repo deletes from B2
+- **Configure**: Browser -> `POST /rollouts` -> service writes `rollouts/<id>/config.json` to B2 -> response
+- **Run**: Browser -> `POST /rollouts/{id}/run` -> service invokes the MuJoCo engine -> per episode, repo `put_object`s the MP4 + `state/action/reward.npy` + summary JSON to B2 -> response
+- **Explore**: Browser -> `GET /rollouts/{id}/episodes` -> repo mints presigned GET URLs -> browser plays the MP4 and downloads arrays **directly from B2**
+- **List**: Browser -> `GET /files` (or `GET /rollouts`) -> service calls repo -> returns the list
+- **Delete**: Browser -> `DELETE /rollouts/{id}` -> service -> repo deletes every object under the rollout prefix (scoped)
 
 ## Observability
 
 - Structured JSON logging on all requests with `request_id`
 - Request timing middleware (logs duration per request; also the catch-all that converts uncaught exceptions to a typed JSON 500)
-- `/metrics` endpoint (Prometheus format: request count, latency, upload count)
+- `/metrics` endpoint (Prometheus format: request count, latency)
 - `/health` endpoint (B2 connectivity check)
 
 ## API Contract
@@ -158,6 +161,7 @@ still in step.
 | --- | --- | --- |
 | `DELETE /files-by-key` | `DeleteFileResponse` | `fileByKeyDelete` |
 | `DELETE /files/{key}` | `DeleteFileResponse` | `legacyFileDelete` |
+| `DELETE /rollouts/{rollout_id}` | `RolloutDeleteResult` | `rolloutDelete` |
 | `GET /files` | `FileMetadata[]` | `files` |
 | `GET /files-by-key/detail` | `FileMetadataDetail` | `fileByKeyDetail` |
 | `GET /files-by-key/download` | `FileUrlResponse` | `fileByKeyDownload` |
@@ -170,8 +174,13 @@ still in step.
 | `GET /files/stats/activity` | `DailyUploadCount[]` | `uploadActivity` |
 | `GET /health` | `HealthStatus` | `health` |
 | `GET /metrics` | — | _server-only_ |
-| `POST /upload/presign` | `PresignUploadResponse` | `uploadPresign` |
-| `POST /upload/verify` | `FileUploadResponse` | `uploadVerify` |
+| `GET /rollouts` | `RolloutList` | `rollouts` |
+| `GET /rollouts/{rollout_id}` | `RolloutDetail` | `rolloutDetail` |
+| `GET /rollouts/{rollout_id}/episodes` | `EpisodeList` | `rolloutEpisodes` |
+| `GET /rollouts/{rollout_id}/episodes/{episode_id}/assets` | `EpisodeAssets` | `episodeAssets` |
+| `PATCH /rollouts/{rollout_id}` | `Rollout` | `rolloutUpdate` |
+| `POST /rollouts` | `Rollout` | `rolloutCreate` |
+| `POST /rollouts/{rollout_id}/run` | `RolloutRunResult` | `rolloutRun` |
 <!-- gen:end arch-api-contract -->
 
 ## Canonical Files
@@ -204,11 +213,12 @@ Generated — **never hand-edit**; change the source and re-run the command:
 ## Core Features
 
 <!-- gen:begin arch-core-features -->
-- [File Upload](docs/features/file-upload.md) — drag-and-drop upload with real-time progress
-- [File Browser](docs/features/file-browser.md) — list, preview, download, delete files
-- [Dashboard](docs/features/dashboard.md) — stats cards, upload chart, recent uploads
-- [Metadata Extraction](docs/features/metadata-extraction.md) — image dimensions, EXIF, PDF info, checksums
-- [Settings](docs/features/settings.md) — theme plus labelled demo preference fields
+- [Rollout Configuration](docs/features/rollout-configuration.md) — create, edit, list and delete rollout jobs (environment, episode count, resolution, camera, policy)
+- [Policy Rollout & Rendering](docs/features/policy-rollout.md) — MuJoCo Playground rolls out a policy, records state/action/reward, and renders each episode to MP4 — runs locally, CPU by default
+- [B2 Dataset Write](docs/features/b2-dataset-write.md) — per episode: MP4 + state/action/reward .npy + summary JSON streamed to B2
+- [Dataset Explorer](docs/features/dataset-explorer.md) — browse rollouts and episodes, play rendered video and download trajectory arrays via presigned URLs
+- [Bucket Explorer](docs/features/file-browser.md) — browse the full B2 bucket: list, preview, download, delete
+- [Dashboard](docs/features/dashboard.md) — rollout and episode stats, cumulative reward, storage used, recent rollouts
 <!-- gen:end arch-core-features -->
 
 ## References

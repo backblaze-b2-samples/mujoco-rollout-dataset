@@ -8,20 +8,36 @@ import {
 } from "@tanstack/react-query";
 import {
   ApiError,
+  createRollout,
   deleteFile,
+  deleteRollout,
   getDownloadUrl,
+  getEpisodes,
   getFileDetail,
   getFiles,
   getFileStats,
   getHealth,
   getPreviewUrl,
+  getRollout,
   getUploadActivity,
+  listRollouts,
+  runRollout,
+  updateRollout,
 } from "@/lib/api-client";
 import type {
+  EpisodeList,
   FileMetadata,
   FileMetadataDetail,
   FileUrlResponse,
-} from "@vibe-coding-starter-kit/shared";
+  Rollout,
+  RolloutCreate,
+  RolloutDeleteResult,
+  RolloutDetail,
+  RolloutList,
+  RolloutRunRequest,
+  RolloutRunResult,
+  RolloutUpdate,
+} from "@mujoco-rollout-dataset/shared";
 import { qk } from "@/lib/generated/query-keys";
 
 // Query keys are GENERATED from the API contract (`pnpm gen:api`) and their
@@ -31,22 +47,28 @@ import { qk } from "@/lib/generated/query-keys";
 // public surface: components and tests import `qk` from `@/lib/queries`.
 //
 // The caching policy below — staleTime, refetchInterval, retry, `enabled`
-// gating, the query-vs-mutation choice, and the cache surgery in
-// `dropDeletedFileFromCache` — is hand-written on purpose and is never
-// generated.
+// gating, the query-vs-mutation choice, and the cache surgery — is hand-written
+// on purpose and is never generated. The per-id rollout/episode keys below are
+// hand-written too: the generator keys only off query parameters, so a
+// path-parameter read (one rollout) needs its id folded into the key here.
 export { qk };
+
+/** Nested under qk.all so invalidating qk.all (or `[...qk.all, "rollout"]`) reaches them. */
+const rolloutDetailKey = (id: string) => [...qk.all, "rollout", id] as const;
+const rolloutEpisodesKey = (id: string) =>
+  [...qk.all, "rollout", id, "episodes"] as const;
 
 export type Health = Awaited<ReturnType<typeof getHealth>>;
 
 /**
  * Gate a query on something being open/visible. Deliberately the only option we
- * expose, so callers can't drift the caching policy per call site — the ⌘K
- * palette reuses `useFiles`' key (and therefore its cache) instead of fetching
- * its own private, smaller list.
+ * expose, so callers can't drift the caching policy per call site.
  */
 export interface QueryGate {
   enabled?: boolean;
 }
+
+// --- bucket explorer + dashboard stats (kept from the starter) -----------
 
 export function useFiles(prefix = "", limit = 100, { enabled = true }: QueryGate = {}) {
   return useQuery<FileMetadata[], ApiError>({
@@ -71,9 +93,9 @@ export function useUploadActivity(days = 7) {
   });
 }
 
-// Presigned preview URL — only fetched when `enabled` is true (e.g., when
-// the dialog opens for a specific file). Kept short-lived (60s) because
-// the URL itself has a presigned expiry and is cheap to regenerate.
+// Presigned preview URL — only fetched when `enabled` is true (e.g. when the
+// dialog opens for a specific file). Short-lived because the URL has a presigned
+// expiry and is cheap to regenerate.
 export function usePreviewUrl(key: string | undefined, enabled: boolean) {
   return useQuery({
     queryKey: qk.preview(key ?? ""),
@@ -83,10 +105,6 @@ export function usePreviewUrl(key: string | undefined, enabled: boolean) {
   });
 }
 
-// Rich metadata for an already-stored file. The server recomputes it on demand
-// (a full object download), so it's only fetched when `enabled` — i.e. the
-// preview dialog is open AND the user expands "Detailed metadata". Kept
-// short-lived like the preview URL; cheap correctness under key overwrites.
 export function useFileDetail(key: string | undefined, enabled: boolean) {
   return useQuery<FileMetadataDetail, ApiError>({
     queryKey: qk.detail(key ?? ""),
@@ -96,10 +114,8 @@ export function useFileDetail(key: string | undefined, enabled: boolean) {
   });
 }
 
-// Health poll for the top-of-app B2 banner. `retry: false` and letting a
-// failed fetch leave `data` undefined keeps a down API silent (the
-// per-component ErrorState covers that); the banner only reacts to an up API
-// reporting b2_connected: false. Polls every 60s and on window focus.
+// Health poll for the top-of-app B2 banner. `retry: false` keeps a down API
+// silent; the banner only reacts to an up API reporting b2_connected: false.
 export function useHealth() {
   return useQuery<Health>({
     queryKey: qk.health(),
@@ -110,48 +126,24 @@ export function useHealth() {
   });
 }
 
-/**
- * Drop a deleted object from every cached file list, plus its own cached
- * preview/detail entries.
- *
- * Invalidation alone is not enough: the refetch re-lists the whole bucket and
- * took 5-6s in practice, so the success toast fired while the row was still
- * listed — and using that stale row's Preview 404'd. Editing the cache makes
- * the row disappear with the toast; the invalidation that follows still
- * reconciles against the server.
- *
- * Exported for tests — the mutation below is its only production caller.
- */
 export function dropDeletedFileFromCache(qc: QueryClient, fileKey: string) {
   qc.setQueriesData<FileMetadata[]>(
-    // Partial key: matches qk.files(prefix, limit) for every prefix/limit.
     { queryKey: [...qk.all, "files"] },
     (previous) =>
       previous ? previous.filter((file) => file.key !== fileKey) : previous,
   );
-  // A presigned URL for a deleted key can only 404 now.
   qc.removeQueries({ queryKey: qk.preview(fileKey) });
   qc.removeQueries({ queryKey: qk.detail(fileKey) });
 }
 
 /**
- * Fetch a download URL for one file.
- *
- * A mutation, not a query: it has a server side effect (it bumps the download
- * counter) and it must never be cached or replayed. Being a mutation is also
- * what gives the UI an honest pending state — the old code awaited the presign
- * inside a plain click handler, so a slow round trip left the screen completely
- * unchanged and a user could not tell a working download from a dead button.
- *
- * The caller performs the navigation (see `lib/browser-download.ts`) and gets
- * `isPending` / `variables` for the pending row.
+ * Fetch a download URL for one file. A mutation, not a query: it has a server
+ * side effect (it bumps the download counter) and must never be cached.
  */
 export function useDownloadUrl() {
   const qc = useQueryClient();
   return useMutation<FileUrlResponse, ApiError, FileMetadata>({
     mutationFn: (file) => getDownloadUrl(file.key),
-    // The server counted a download, so the dashboard's "Total Downloads" is
-    // now stale. Cheap: /files/stats reads a cached bucket listing.
     onSuccess: () => qc.invalidateQueries({ queryKey: qk.stats() }),
   });
 }
@@ -161,10 +153,69 @@ export function useDeleteFile() {
   return useMutation({
     mutationFn: (fileKey: string) => deleteFile(fileKey),
     onSuccess: (_data, fileKey) => {
-      // Remove the row immediately, then reconcile everything (lists, stats,
-      // activity) against the server in the background.
       dropDeletedFileFromCache(qc, fileKey);
       qc.invalidateQueries({ queryKey: qk.all });
     },
+  });
+}
+
+// --- rollouts (the primary entity) ---------------------------------------
+
+export function useRollouts(limit = 50) {
+  return useQuery<RolloutList, ApiError>({
+    queryKey: qk.rollouts(limit),
+    queryFn: () => listRollouts(limit),
+  });
+}
+
+export function useRollout(id: string | undefined) {
+  return useQuery<RolloutDetail, ApiError>({
+    queryKey: rolloutDetailKey(id ?? ""),
+    queryFn: () => getRollout(id as string),
+    enabled: !!id,
+  });
+}
+
+export function useEpisodes(id: string | undefined, { enabled = true }: QueryGate = {}) {
+  return useQuery<EpisodeList, ApiError>({
+    queryKey: rolloutEpisodesKey(id ?? ""),
+    queryFn: () => getEpisodes(id as string),
+    enabled: enabled && !!id,
+  });
+}
+
+export function useCreateRollout() {
+  const qc = useQueryClient();
+  return useMutation<Rollout, ApiError, RolloutCreate>({
+    mutationFn: (payload) => createRollout(payload),
+    onSuccess: () => qc.invalidateQueries({ queryKey: [...qk.all, "rollouts"] }),
+  });
+}
+
+export function useUpdateRollout(id: string) {
+  const qc = useQueryClient();
+  return useMutation<Rollout, ApiError, RolloutUpdate>({
+    mutationFn: (patch) => updateRollout(id, patch),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: [...qk.all, "rollouts"] });
+      qc.invalidateQueries({ queryKey: rolloutDetailKey(id) });
+    },
+  });
+}
+
+export function useDeleteRollout() {
+  const qc = useQueryClient();
+  return useMutation<RolloutDeleteResult, ApiError, string>({
+    mutationFn: (id) => deleteRollout(id),
+    // A run/delete changes rollouts, episodes AND bucket stats — reconcile all.
+    onSuccess: () => qc.invalidateQueries({ queryKey: qk.all }),
+  });
+}
+
+export function useRunRollout(id: string) {
+  const qc = useQueryClient();
+  return useMutation<RolloutRunResult, ApiError, RolloutRunRequest | undefined>({
+    mutationFn: (req) => runRollout(id, req ?? {}),
+    onSuccess: () => qc.invalidateQueries({ queryKey: qk.all }),
   });
 }

@@ -1,61 +1,53 @@
-<!-- last_verified: 2026-07-28 -->
+<!-- last_verified: 2026-09-16 -->
 # Feature: Dashboard
 
 ## Purpose
-Provide an at-a-glance overview of file storage usage and recent upload activity.
+Give an at-a-glance overview of rollout activity and the dataset streamed to B2.
 
 ## Used By
 - UI: `/` page (dashboard home)
-- API: `GET /files/stats`, `GET /files`, `GET /files/stats/activity`
+- API: `GET /rollouts`, `GET /files/stats`
 
 ## Core Functions
-- `apps/web/src/components/dashboard/stats-cards.tsx` — 4 stat cards, plus the on-screen loading notice while the bucket scan runs
-- `apps/web/src/components/dashboard/recent-uploads-table.tsx` — last 10 uploads
-- `apps/web/src/components/dashboard/upload-chart.tsx` — bar chart of uploads per day
-- `apps/web/src/lib/api-client.ts` — `getFileStats()`, `getFiles()`, `getUploadActivity()`
-- `services/api/app/runtime/files.py` — `GET /files/stats` handler
-- `services/api/app/service/files.py` — `get_stats()` business logic
-- `services/api/app/repo/b2_client.py` — `get_upload_stats()` data access
-- `services/api/app/repo/list_cache.py` — the shared bucket listing both `/files/stats` and `/files` read, so the dashboard and the file browser never scan twice
-- `apps/web/src/components/common/loading-notice.tsx` — visible, escalating wait copy
+- `apps/web/src/components/dashboard/stats-cards.tsx` — four stat cards (total rollouts, episodes rendered, cumulative reward, B2 storage used)
+- `apps/web/src/components/dashboard/recent-rollouts-table.tsx` — the six most recent rollouts, each a link to its detail page
+- `apps/web/src/components/dashboard/episodes-chart.tsx` — episodes rendered per day over the last week
+- `apps/web/src/lib/queries.ts` — `useRollouts()`, `useFileStats()`
+- `services/api/app/service/rollout.py` — `list_rollouts()` (the aggregate source)
+- `services/api/app/repo/list_cache.py` — the shared bucket listing behind `GET /files/stats`
 
 ## Canonical Files
-- Dashboard page layout: `apps/web/src/components/dashboard/stats-cards.tsx`
-- Stats service logic: `services/api/app/service/files.py`
+- Stat cards: `apps/web/src/components/dashboard/stats-cards.tsx`
 
 ## Inputs
-- None (dashboard loads data automatically)
+- None (the dashboard loads its data automatically)
 
 ## Outputs
-- `GET /files/stats` → `UploadStats` (total_files, total_size_bytes, total_size_human, uploads_today, total_downloads)
-- `GET /files` (limit 10) → `FileMetadata[]` for recent uploads table (sorted newest-first)
-- `GET /files/stats/activity?days=7` → `DailyUploadCount[]` for chart (server-side aggregation)
+- `GET /rollouts` → `RolloutList`, aggregated client-side into rollout count, episode count and cumulative reward
+- `GET /files/stats` → `UploadStats` for total B2 storage used
 
 ## Flow
-- Page loads → three parallel API calls (stats, recent files, upload activity), all served from one cached bucket listing
-- Stats needed ~8.3s to replace the skeletons on a 16k-object bucket, so: the API warms that listing at startup and serves it stale-while-revalidate (only the very first scan after boot can block), and the cards state the wait in words while it runs instead of showing four silent placeholders
-- Stats cards display total files, storage used, uploads today, total downloads
-- Upload chart displays server-aggregated daily counts for last 7 days as bar chart after activity data is known
-- Recent uploads table shows last 10 files with filename, size, type, date, status badge. Each filename is a link to `/files?preview=<key>`, which opens that file's preview in the browser — the rows used to be inert text with no role, tabindex or handler, so the "click a file to preview it" gesture `/files` teaches did nothing here
+- Page loads → `useRollouts` and `useFileStats` fetch in parallel
+- Stat cards show total rollouts, episodes rendered, cumulative reward and B2 storage used
+- The chart buckets each rollout's rendered episodes by creation day over the last 7 days
+- The recent-rollouts table shows the six newest rollouts (name, environment, status, created), each linking to its detail page
 
 ## Edge Cases
-- API unavailable → error states with retry where supported; activity chart does not show a false zero state while loading
-- No files uploaded → empty chart message, empty table message
-- Large file count → stats endpoint paginates through all objects using `ContinuationToken`; the result is cached, so the cost is paid once (at startup) rather than per page view
-- Bucket changed by something other than this app → numbers can lag by up to `LIST_CACHE_TTL_SECONDS` (default 300s). The app's own uploads/deletes invalidate the cache, so they are never stale
+- API unavailable → `ErrorState` with retry; the chart does not show a false zero while loading
+- No rollouts yet → empty chart and table messages
+- Bucket changed elsewhere → storage figure can lag by up to `LIST_CACHE_TTL_SECONDS`; the app's own writes invalidate the cache
 
 ## UX States
-- Loading: an on-screen "Loading bucket stats…" notice above the cards (escalating at 4s and 12s), with skeleton placeholders for cards, table, and upload activity chart
-- Empty: "No files uploaded yet" / "No upload data available yet"
-- Loaded: populated cards, chart, table
+- Loading: a "Loading rollout stats…" notice above skeleton cards, plus chart/table skeletons
+- Empty: "No rollouts yet" / "No episodes yet"
+- Loaded: populated cards, chart and table
 
 ## Verification
-- Test files: `services/api/tests/test_upload_activity.py`, `services/api/tests/test_recent_files.py`, `services/api/tests/test_list_cache.py`, `apps/web/src/lib/loading-progress.test.ts`
-- Required cases: stats with files, stats with empty bucket, API error fallback, cached listing reused across stats and listing calls, loading copy escalating at its thresholds
-- Focused verify command: `pnpm test:api`
+- Test files: `services/api/tests/test_rollouts.py`, `apps/web/src/lib/queries.test.ts`
+- Required cases: aggregates over several rollouts, empty state, API error fallback
+- Focused verify command: `pnpm test:web`
 - Default pre-PR verify command: `pnpm verify`
-- Full local verify command: `pnpm verify:full` when the E2E/live prerequisites in [Verification](../verification.md#non-live-verification) are available
-- Pass criteria: focused tests and `pnpm verify` green; explain any skipped `pnpm verify:full` prerequisites
+- Pass criteria: focused tests and `pnpm verify` green
 
 ## Related Docs
 - [ARCHITECTURE.md](../../ARCHITECTURE.md)

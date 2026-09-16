@@ -45,12 +45,10 @@ describe("loadDemoPreferences", () => {
   it("round-trips a full set of values", () => {
     installStorage();
     const values: DemoPreferences = {
-      displayName: "Ada Lovelace",
-      bio: "first programmer",
-      defaultView: "grid",
-      emailOnUpload: true,
-      warnNearQuota: false,
-      quotaThreshold: "72",
+      defaultEnvironment: "AntRun",
+      defaultResolution: "480p",
+      defaultEpisodeCount: "5",
+      notifyOnComplete: false,
     };
     expect(saveDemoPreferences(values)).toBe(true);
     expect(loadDemoPreferences()).toEqual(values);
@@ -59,13 +57,13 @@ describe("loadDemoPreferences", () => {
   it("falls back field-by-field on a partial or wrongly-typed blob", () => {
     const store = installStorage();
     store[KEY] = JSON.stringify({
-      displayName: "Grace",
-      defaultView: "spreadsheet", // not a valid option
-      emailOnUpload: "yes", // wrong type
+      defaultEnvironment: "AntRun",
+      defaultResolution: "8k", // not a valid option
+      notifyOnComplete: "yes", // wrong type
     });
     expect(loadDemoPreferences()).toEqual({
       ...DEMO_PREFERENCES_DEFAULTS,
-      displayName: "Grace",
+      defaultEnvironment: "AntRun",
     });
   });
 

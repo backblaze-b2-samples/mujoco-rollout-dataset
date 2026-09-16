@@ -1,0 +1,24 @@
+# Gated engine dependencies for the MuJoCo Playground rollout + render path.
+#
+# NOT installed by `pnpm run setup`, `pnpm verify`, or CI: the baseline
+# requirements.txt keeps config/CRUD, the bucket explorer, the dataset explorer
+# and the dashboard working without this heavy stack. Install it only to run
+# rollouts locally:
+#
+#   services/api/.venv/bin/pip install -r services/api/requirements-ml.txt
+#
+# Device selection is runtime auto-detect (CUDA -> CPU). JAX has no Apple-MPS
+# backend, so on macOS it runs on CPU — supported, just slower. On Linux a CUDA
+# jaxlib is picked up automatically when present; a GPU is never required.
+#
+# app/service/mujoco_engine.py lazy-imports these and raises an actionable
+# EngineUnavailableError (persisted as a `failed` rollout) when they are absent,
+# so the API never 500s on a host without the engine.
+
+jax>=0.4.35
+mujoco>=3.2.0
+mujoco-mjx>=3.2.0
+playground>=0.0.4          # PyPI package `playground`; imports as `mujoco_playground`
+numpy>=1.26,<3
+imageio>=2.34.0
+imageio-ffmpeg>=0.5.0

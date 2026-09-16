@@ -1,50 +1,49 @@
 /**
- * Illustrative "Profile" and "Preferences" settings for the starter kit.
+ * Illustrative "rollout preferences" for the settings page.
  *
- * These controls are a deliberate DEMO. They exist to show what a settings page
- * can look like when you adapt the kit — a profile, notification and quota
- * preferences, a default file view — without pretending the kit ships the
- * backend that would make them real (there is no account system, mailer, quota
- * service, or activity log). The Settings page says so in a banner, and this
- * module persists the values to `localStorage` only: a faithful demo of the
- * client-side persistence you would later point at your own API.
+ * These controls are a deliberate DEMO of client-side persistence. They record
+ * the environment, resolution and episode count you'd like the New-rollout form
+ * to start from — but the kit does not yet read them back into that form, so
+ * they change no behaviour on their own. The Settings page says so in a banner,
+ * and this module persists the values to `localStorage` only: a faithful demo
+ * of the persistence you would later wire into your own preferences API.
  *
  * The one preference the app genuinely honours — Theme — is NOT here; it is
  * owned by `next-themes` (see `theme-preference.ts`) and applied for real.
  */
 
 import { APP_SLUG } from "@/lib/app-config";
+import { ENVIRONMENTS, RESOLUTIONS } from "@/lib/rollout-options";
 
-export const DEMO_VIEW_OPTIONS = ["tree", "list", "grid"] as const;
-export type DemoViewOption = (typeof DEMO_VIEW_OPTIONS)[number];
+export type DemoResolution = (typeof RESOLUTIONS)[number];
 
 export interface DemoPreferences {
-  displayName: string;
-  bio: string;
-  defaultView: DemoViewOption;
-  emailOnUpload: boolean;
-  warnNearQuota: boolean;
+  defaultEnvironment: string;
+  defaultResolution: DemoResolution;
   /** Kept as a string to match the numeric `<input>` the form binds to. */
-  quotaThreshold: string;
+  defaultEpisodeCount: string;
+  notifyOnComplete: boolean;
 }
 
 export const DEMO_PREFERENCES_DEFAULTS: DemoPreferences = {
-  displayName: "Anonymous",
-  bio: "",
-  defaultView: "tree",
-  emailOnUpload: false,
-  warnNearQuota: true,
-  quotaThreshold: "80",
+  defaultEnvironment: "CartpoleBalance",
+  defaultResolution: "240p",
+  defaultEpisodeCount: "2",
+  notifyOnComplete: true,
 };
 
 /** Namespaced by app slug so two of these apps on one origin cannot collide. */
 export const DEMO_PREFERENCES_STORAGE_KEY = `${APP_SLUG}-demo-preferences`;
 
-function isViewOption(value: unknown): value is DemoViewOption {
+function isEnvironment(value: unknown): value is string {
   return (
     typeof value === "string" &&
-    (DEMO_VIEW_OPTIONS as readonly string[]).includes(value)
+    ENVIRONMENTS.some((env) => env.value === value)
   );
+}
+
+function isResolution(value: unknown): value is DemoResolution {
+  return typeof value === "string" && (RESOLUTIONS as readonly string[]).includes(value);
 }
 
 /**
@@ -69,26 +68,20 @@ export function loadDemoPreferences(): DemoPreferences {
 
   const s = stored as Record<string, unknown>;
   return {
-    displayName:
-      typeof s.displayName === "string"
-        ? s.displayName
-        : DEMO_PREFERENCES_DEFAULTS.displayName,
-    bio: typeof s.bio === "string" ? s.bio : DEMO_PREFERENCES_DEFAULTS.bio,
-    defaultView: isViewOption(s.defaultView)
-      ? s.defaultView
-      : DEMO_PREFERENCES_DEFAULTS.defaultView,
-    emailOnUpload:
-      typeof s.emailOnUpload === "boolean"
-        ? s.emailOnUpload
-        : DEMO_PREFERENCES_DEFAULTS.emailOnUpload,
-    warnNearQuota:
-      typeof s.warnNearQuota === "boolean"
-        ? s.warnNearQuota
-        : DEMO_PREFERENCES_DEFAULTS.warnNearQuota,
-    quotaThreshold:
-      typeof s.quotaThreshold === "string"
-        ? s.quotaThreshold
-        : DEMO_PREFERENCES_DEFAULTS.quotaThreshold,
+    defaultEnvironment: isEnvironment(s.defaultEnvironment)
+      ? s.defaultEnvironment
+      : DEMO_PREFERENCES_DEFAULTS.defaultEnvironment,
+    defaultResolution: isResolution(s.defaultResolution)
+      ? s.defaultResolution
+      : DEMO_PREFERENCES_DEFAULTS.defaultResolution,
+    defaultEpisodeCount:
+      typeof s.defaultEpisodeCount === "string"
+        ? s.defaultEpisodeCount
+        : DEMO_PREFERENCES_DEFAULTS.defaultEpisodeCount,
+    notifyOnComplete:
+      typeof s.notifyOnComplete === "boolean"
+        ? s.notifyOnComplete
+        : DEMO_PREFERENCES_DEFAULTS.notifyOnComplete,
   };
 }
 

@@ -18,8 +18,18 @@
   },
 
   "operations": {
-    "$comment": "Per-operation naming. `route` is the key in the generated route registry. `query` is present only for operations the UI caches under a TanStack Query key: `name` is the factory member and `segments` are the key parts appended to the root, which is how a deliberate cache hierarchy (invalidating the parent also invalidates the child) is expressed. An operation missing from this map still generates: `route` falls back to a camel-cased path plus a verb suffix, and no query key is emitted. So adding an endpoint needs no edit here unless you want a hand-picked name.",
+    "$comment": "Per-operation naming. `route` is the key in the generated route registry. `query` is present only for operations the UI caches under a TanStack Query key: `name` is the factory member and `segments` are the key parts appended to the root. Path-parameter reads (a single rollout, its episodes) declare no `query` here — the generator keys only off query parameters, so their per-id cache keys are hand-written in apps/web/src/lib/queries.ts. An operation missing from this map still generates: `route` falls back to a camel-cased path plus a verb suffix.",
     "get /health": { "route": "health", "query": { "name": "health", "segments": ["health"] } },
+
+    "get /rollouts": { "route": "rollouts", "query": { "name": "rollouts", "segments": ["rollouts"] } },
+    "post /rollouts": { "route": "rolloutCreate" },
+    "get /rollouts/{rollout_id}": { "route": "rolloutDetail" },
+    "patch /rollouts/{rollout_id}": { "route": "rolloutUpdate" },
+    "delete /rollouts/{rollout_id}": { "route": "rolloutDelete" },
+    "post /rollouts/{rollout_id}/run": { "route": "rolloutRun" },
+    "get /rollouts/{rollout_id}/episodes": { "route": "rolloutEpisodes" },
+    "get /rollouts/{rollout_id}/episodes/{episode_id}/assets": { "route": "episodeAssets" },
+
     "get /files": { "route": "files", "query": { "name": "files", "segments": ["files"] } },
     "get /files/stats": { "route": "fileStats", "query": { "name": "stats", "segments": ["stats"] } },
     "get /files/stats/activity": {
@@ -40,16 +50,14 @@
     "get /files/{key}/download": { "route": "legacyFileDownload" },
     "get /files/{key}/preview": { "route": "legacyFilePreview" },
     "get /files/{key}": { "route": "legacyFileMetadata" },
-    "delete /files/{key}": { "route": "legacyFileDelete" },
-    "post /upload/presign": { "route": "uploadPresign" },
-    "post /upload/verify": { "route": "uploadVerify" }
+    "delete /files/{key}": { "route": "legacyFileDelete" }
   },
 
   "escapeHatch": {
     "$comment": "The generator owns the mechanical slice only. Everything named here is hand-written on purpose because it encodes per-app judgement the contract does not describe, and `pnpm gen:api` never writes to these paths. If you need behaviour the generator cannot express, it belongs in one of these files — not in a generated one.",
     "handWritten": {
-      "apps/web/src/lib/api-client.ts": "error policy, API base resolution, the legacy-route fallback, CORS diagnostics and the XHR upload transport",
-      "apps/web/src/lib/queries.ts": "every caching, polling, invalidation and query-vs-mutation decision",
+      "apps/web/src/lib/api-client.ts": "error policy, API base resolution, the legacy-route fallback, CORS diagnostics and per-entity request helpers",
+      "apps/web/src/lib/queries.ts": "every caching, polling, invalidation and query-vs-mutation decision, plus the per-id rollout/episode query keys",
       "packages/shared/src/types.ts": "the public barrel: re-exports the generated types and adds frontend-only types the API knows nothing about"
     }
   }
