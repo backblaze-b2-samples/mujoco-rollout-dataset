@@ -18,7 +18,7 @@
 jax>=0.4.35
 mujoco>=3.2.0
 mujoco-mjx>=3.2.0
-playground>=0.0.4          # PyPI package `playground`; imports as `mujoco_playground`
+playground>=0.2.0          # PyPI package `playground`; imports as `mujoco_playground`
 numpy>=1.26,<3
 imageio>=2.34.0
 imageio-ffmpeg>=0.5.0
