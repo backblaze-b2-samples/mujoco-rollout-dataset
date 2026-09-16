@@ -25,6 +25,24 @@ app's own features instead of rebuilding the same shell. Storage is
 > **Deploy your own in one click** → [Deploy to Vercel](#deploying-to-vercel). One project, one origin, no CORS to wire up.
 <!-- gen:end readme-screenshots -->
 
+## What it looks like
+
+**Dashboard** — rollout and episode totals, cumulative reward, B2 storage used, a 7-day episodes-rendered chart, and a recent-rollouts table.
+
+![Dashboard with rollout stats, cumulative reward, B2 storage, episodes chart and recent rollouts](docs/images/dashboard.png)
+
+**Rollouts** — every configured rollout job with its environment, episode progress, reward, run status and creation time.
+
+![Rollouts list showing configured jobs with environment, episode progress, reward and status](docs/images/rollouts.png)
+
+**Rollout detail** — a single job's full configuration alongside each rendered episode: inline MP4 playback plus per-episode reward and downloadable state/action/reward arrays and summary JSON.
+
+![Rollout detail with configuration panel and rendered CartPole episodes with trajectory downloads](docs/images/rollout-detail.png)
+
+**Dataset explorer** — browse a rollout's rendered episodes, play each one inline and download its trajectory arrays, all served by presigned B2 URLs.
+
+![Dataset explorer playing rendered episodes with trajectory-array downloads via presigned B2 URLs](docs/images/dataset-explorer.png)
+
 ## Quick Start
 
 You need: Node.js >= 20, pnpm >= 10, Python >= 3.12, and a free **[Backblaze B2 account](https://www.backblaze.com/sign-up/ai-cloud-storage?utm_source=github&utm_medium=referral&utm_campaign=ai_artifacts&utm_content=b2ai-mujoco-rollout-dataset)**.
