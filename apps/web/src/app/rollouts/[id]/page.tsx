@@ -8,6 +8,7 @@ import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ErrorState } from "@/components/ui/error-state";
@@ -58,6 +59,17 @@ export default function RolloutDetailPage() {
   const rollout: Rollout | undefined = data?.rollout;
   const episodes = data?.episodes ?? [];
   const editable = rollout?.status === "draft" || rollout?.status === "failed";
+  // Derived from the fetched status (not just local mutation state) so a
+  // reload mid-run still shows the rollout as running and can't be double-run;
+  // `useRollout` polls while this is true until the run resolves on its own.
+  const isRunning = rollout?.status === "running";
+  const runDisabled = runRollout.isPending || isRunning;
+  // Live render progress: episode_count_done advances incrementally while the
+  // backend renders (polled every 3s by useRollout), so this bar moves during
+  // the render instead of sitting at 0 until the run completes.
+  const renderProgressPct = rollout && rollout.episode_count > 0
+    ? Math.min(100, (rollout.episode_count_done / rollout.episode_count) * 100)
+    : 0;
 
   const handleRun = () => {
     runRollout.mutate(undefined, {
@@ -124,15 +136,22 @@ export default function RolloutDetailPage() {
                 {rollout.environment} · {rollout.episode_count_done}/{rollout.episode_count} episodes
                 rendered
               </p>
+              {isRunning && (
+                <Progress
+                  value={renderProgressPct}
+                  aria-label="Render progress"
+                  className="h-1.5 w-48"
+                />
+              )}
             </div>
             <div className="flex items-center gap-2">
-              <Button size="sm" onClick={handleRun} disabled={runRollout.isPending}>
-                {runRollout.isPending ? (
+              <Button size="sm" onClick={handleRun} disabled={runDisabled}>
+                {runDisabled ? (
                   <Loader2 className="h-3.5 w-3.5 animate-spin" />
                 ) : (
                   <Play className="h-3.5 w-3.5" />
                 )}
-                {runRollout.isPending ? "Rendering..." : "Run"}
+                {runDisabled ? "Rendering..." : "Run"}
               </Button>
               {editable && (
                 <Dialog open={editOpen} onOpenChange={setEditOpen}>

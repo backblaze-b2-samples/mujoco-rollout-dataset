@@ -156,7 +156,7 @@ async def test_run_without_engine_persists_failed(client, store, monkeypatch):
     created = await _create(client, name="run")
     rid = created["id"]
 
-    def _no_engine(config, episode_count, seed):
+    def _no_engine(config, episode_count, seed, progress_cb=None):
         raise mujoco_engine.EngineUnavailableError("engine not installed")
 
     monkeypatch.setattr(rollout_service, "run_episodes", _no_engine)
@@ -173,12 +173,44 @@ async def test_run_without_engine_persists_failed(client, store, monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_run_blocked_when_already_running(client, store, monkeypatch):
+    """A second run on an already-running rollout is refused, not raced.
+
+    Without this guard, calling run twice starts two concurrent MuJoCo renders
+    that contend for the same B2 prefix and overwrite each other's episodes.
+    """
+    created = await _create(client, name="racing")
+    rid = created["id"]
+
+    calls = 0
+
+    def _fake_episodes(config, episode_count, seed, progress_cb=None):
+        nonlocal calls
+        calls += 1
+        return []
+
+    monkeypatch.setattr(rollout_service, "run_episodes", _fake_episodes)
+
+    # Force the stored config into "running", as a first in-flight run would.
+    config = json.loads(store[f"rollouts/{rid}/config.json"][0])
+    config["status"] = "running"
+    store[f"rollouts/{rid}/config.json"] = (json.dumps(config).encode(), "application/json")
+
+    blocked = await client.post(f"/rollouts/{rid}/run", json={})
+    assert blocked.status_code == 409
+    assert calls == 0
+
+    persisted = json.loads(store[f"rollouts/{rid}/config.json"][0])
+    assert persisted["status"] == "running"
+
+
+@pytest.mark.asyncio
 async def test_run_writes_episode_artifacts(client, store, monkeypatch):
     """A successful run streams every episode's five artifacts to B2."""
     created = await _create(client, name="ok", episode_count=1)
     rid = created["id"]
 
-    def _fake_episodes(config, episode_count, seed):
+    def _fake_episodes(config, episode_count, seed, progress_cb=None):
         return [
             mujoco_engine.EpisodeArtifacts(
                 episode_id="ep-0000",
@@ -211,3 +243,54 @@ async def test_run_writes_episode_artifacts(client, store, monkeypatch):
     persisted = json.loads(store[f"rollouts/{rid}/config.json"][0])
     assert persisted["status"] == "complete"
     assert persisted["episode_count_done"] == 1
+
+
+@pytest.mark.asyncio
+async def test_run_persists_incremental_progress(client, store, monkeypatch):
+    """episode_count_done advances mid-render, not just once at the end.
+
+    The frontend polls the rollout every 3s while running; this proves the
+    backend actually gives it something to see mid-render instead of holding
+    episode_count_done at 0 until the whole render finishes.
+    """
+    created = await _create(client, name="progressive", episode_count=2)
+    rid = created["id"]
+
+    def _artifact(episode_id: str, reward: float) -> mujoco_engine.EpisodeArtifacts:
+        return mujoco_engine.EpisodeArtifacts(
+            episode_id=episode_id,
+            total_reward=reward,
+            length=5,
+            success=True,
+            video_bytes=b"MP4",
+            video_content_type="video/mp4",
+            video_filename="video.mp4",
+            state_npy=b"STATE",
+            action_npy=b"ACTION",
+            reward_npy=b"REWARD",
+            summary={"total_reward": reward, "length": 5, "success": True},
+        )
+
+    seen_intermediate: list[int] = []
+
+    def _progressive_episodes(config, episode_count, seed, progress_cb=None):
+        assert progress_cb is not None
+        progress_cb(1)
+        # Read back what run_rollout's callback persisted before the second
+        # episode "finishes" — proves the write happened mid-render.
+        persisted = json.loads(store[f"rollouts/{rid}/config.json"][0])
+        seen_intermediate.append(persisted["episode_count_done"])
+        progress_cb(2)
+        return [_artifact("ep-0000", 1.0), _artifact("ep-0001", 2.0)]
+
+    monkeypatch.setattr(rollout_service, "run_episodes", _progressive_episodes)
+
+    resp = await client.post(f"/rollouts/{rid}/run", json={})
+    assert resp.status_code == 200
+    assert resp.json()["status"] == "complete"
+
+    assert seen_intermediate == [1]
+
+    persisted = json.loads(store[f"rollouts/{rid}/config.json"][0])
+    assert persisted["status"] == "complete"
+    assert persisted["episode_count_done"] == 2

@@ -96,6 +96,8 @@ def run_rollout_endpoint(rollout_id: str, req: RolloutRunRequest | None = None):
         return run_rollout(rollout_id, req or RolloutRunRequest())
     except RolloutNotFoundError as e:
         raise HTTPException(status_code=404, detail=e.detail) from None
+    except RolloutStateError as e:
+        raise HTTPException(status_code=409, detail=e.detail) from None
     except RuntimeError:
         raise HTTPException(status_code=502, detail="Failed to write rollout artifacts to storage") from None
 

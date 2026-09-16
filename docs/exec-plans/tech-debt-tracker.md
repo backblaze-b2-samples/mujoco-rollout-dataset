@@ -60,3 +60,8 @@ Known tech debt items. Agents update this when they discover or create tech debt
 | Custom `FileNotFoundError` shadowed the built-in | Renamed to `FileNotFoundServiceError` |
 | Dropzone accepted any file type client-side | `accept` allow-list mirroring backend `ALLOWED_TYPES` (tested for drift) |
 | No test harness for feature specs | pytest suite across upload, files, activity, errors, validation, rate limit, pagination |
+
+## 2026-09-16 — verify
+- Dataset explorer rollout selector — the `<Select>` trigger (`w-72`) truncates the environment name mid-word with no ellipsis or tooltip → similarly-named rollouts get hard to disambiguate (.local/verify/A/07-dataset-explorer.png)
+- Rollouts / Dataset API-error state — shows "Can't reach the API … Make sure the API is running (`pnpm dev:api`)" even when the API is up and the real cause is a CORS/network rejection → misattributes the cause and sends users to restart a healthy server (.local/verify/A/r1-02-rollouts-empty.png)
+- Rollout detail Configuration — displays `Camera: side` but the render fell back to the env-default camera (env has no `side` camera) → the UI reports a camera value not actually used for the render (.local/verify/B/r2-04-detail-complete.png)

@@ -48,6 +48,36 @@ async def test_unhandled_exception_500_carries_cors_headers(client, monkeypatch)
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "origin",
+    [
+        "http://localhost:3000",
+        "http://localhost:3001",
+        "http://127.0.0.1:3000",
+        "http://127.0.0.1:3001",
+    ],
+)
+async def test_cors_allowlist_covers_localhost_and_127_0_0_1(
+    client, monkeypatch, origin
+):
+    """Regression guard for the 127.0.0.1-vs-localhost CORS gap.
+
+    `apps/web/playwright.config.ts` (and this app's own verify tooling)
+    deliberately serves/drives the frontend at 127.0.0.1 to dodge a macOS
+    `localhost` -> ::1 miss. The default `api_cors_origins` (settings.py)
+    must trust both hostnames on both dev ports or every browser->API call
+    from a 127.0.0.1-served page is silently CORS-blocked.
+    """
+
+    monkeypatch.setattr(files_service, "list_files", lambda **kwargs: [])
+
+    response = await client.get("/files", headers={"Origin": origin})
+
+    assert response.status_code == 200
+    assert response.headers.get("access-control-allow-origin") == origin
+
+
+@pytest.mark.asyncio
 async def test_stats_b2_failure_returns_500(client, monkeypatch):
     """Stats endpoint returns 500 when B2 is unreachable."""
 

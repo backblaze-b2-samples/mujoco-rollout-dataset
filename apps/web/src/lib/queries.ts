@@ -173,6 +173,10 @@ export function useRollout(id: string | undefined) {
     queryKey: rolloutDetailKey(id ?? ""),
     queryFn: () => getRollout(id as string),
     enabled: !!id,
+    // Self-advance a running rollout to its terminal status without a manual
+    // reload: poll while running, stop once complete/failed (or on error).
+    refetchInterval: (query) =>
+      query.state.data?.rollout.status === "running" ? 3000 : false,
   });
 }
 

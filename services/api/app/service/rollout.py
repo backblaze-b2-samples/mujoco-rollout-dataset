@@ -185,12 +185,20 @@ def run_rollout(rollout_id: str, req: RolloutRunRequest) -> RolloutRunResult:
     as ``failed`` and returned as such — the endpoint never 500s.
     """
     config = _load_config(rollout_id)
+    if config["status"] == "running":
+        raise RolloutStateError("Rollout is already running")
     episode_count = req.episode_count or config["episode_count"]
     seed = req.seed if req.seed is not None else config["seed"]
     _persist_status(config, "running")
 
+    def _on_episode_done(done: int) -> None:
+        # Persist incremental progress so a poller sees the count advance
+        # mid-render instead of jumping from 0 straight to episode_count.
+        config["episode_count_done"] = done
+        rollout_store.put_json(rollout_store.config_key(rollout_id), config)
+
     try:
-        artifacts = run_episodes(config, episode_count, seed)
+        artifacts = run_episodes(config, episode_count, seed, progress_cb=_on_episode_done)
     except EngineUnavailableError as e:
         _persist_status(config, "failed")
         logger.warning("Rollout %s failed: engine unavailable", rollout_id)

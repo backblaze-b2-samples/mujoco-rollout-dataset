@@ -20,6 +20,7 @@ backend, so on macOS it runs on CPU; a GPU is never hard-required.
 import io
 import logging
 import zipfile
+from collections.abc import Callable
 from dataclasses import dataclass
 
 logger = logging.getLogger(__name__)
@@ -116,11 +117,21 @@ def _npy_bytes(np, array) -> bytes:
     return buf.getvalue()
 
 
-def run_episodes(config: dict, episode_count: int, seed: int) -> list[EpisodeArtifacts]:
+def run_episodes(
+    config: dict,
+    episode_count: int,
+    seed: int,
+    progress_cb: Callable[[int], None] | None = None,
+) -> list[EpisodeArtifacts]:
     """Roll out `episode_count` episodes and return their rendered artifacts.
 
     Raises :class:`EngineUnavailableError` when the engine stack is not
     installed, so the caller can persist a ``failed`` run rather than 500.
+
+    ``progress_cb``, when given, is invoked with the number of episodes
+    rendered so far after each episode completes, so a caller can persist
+    incremental progress. A callback failure is logged and swallowed — it
+    must never abort the render.
     """
     try:
         import imageio.v2 as imageio
@@ -216,6 +227,12 @@ def run_episodes(config: dict, episode_count: int, seed: int) -> list[EpisodeArt
                 summary=summary,
             )
         )
+
+        if progress_cb is not None:
+            try:
+                progress_cb(len(artifacts))
+            except Exception:
+                logger.warning("progress_cb raised; continuing render", exc_info=True)
 
     return artifacts
 
